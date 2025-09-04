@@ -218,6 +218,7 @@ CUDA_ROUTINE_HANDLER(EventElapsedTime);
 CUDA_ROUTINE_HANDLER(EventQuery);
 CUDA_ROUTINE_HANDLER(EventRecord);
 CUDA_ROUTINE_HANDLER(EventSynchronize);
+CUDA_ROUTINE_HANDLER(EventRecordWithFlags);
 
 /* CudaRtHandler_execution */
 CUDA_ROUTINE_HANDLER(ConfigureCall);
