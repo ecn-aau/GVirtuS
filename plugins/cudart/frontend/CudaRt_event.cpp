@@ -133,3 +133,12 @@ cudaEventSynchronize(cudaEvent_t event) {
   CudaRtFrontend::Execute("cudaEventSynchronize");
   return CudaRtFrontend::GetExitCode();
 }
+
+extern "C" __host__ cudaError_t CUDARTAPI cudaEventRecordWithFlags(cudaEvent_t event, cudaStream_t stream, unsigned int  flags) {
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::AddDevicePointerForArguments(event);
+    CudaRtFrontend::AddDevicePointerForArguments(stream);
+    CudaRtFrontend::AddVariableForArguments(flags);
+    CudaRtFrontend::Execute("cudaEventRecordWithFlags");
+    return CudaRtFrontend::GetExitCode();
+}
