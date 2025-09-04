@@ -140,3 +140,15 @@ CUDA_ROUTINE_HANDLER(EventSynchronize) {
     return std::make_shared<Result>(cudaErrorMemoryAllocation);
   }
 }
+
+CUDA_ROUTINE_HANDLER(EventRecordWithFlags) {
+    try {
+        cudaEvent_t event = input_buffer->Get<cudaEvent_t>();
+        cudaStream_t stream = input_buffer->Get<cudaStream_t>();
+        int flags = input_buffer->Get<int>();
+        return std::make_shared<Result>(cudaEventRecordWithFlags(event, stream,flags));
+    } catch (const std::exception& e) {
+        cerr << e.what() << endl;
+        return std::make_shared<Result>(cudaErrorMemoryAllocation);
+    }
+}
