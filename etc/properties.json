@@ -1,25 +1,19 @@
 {
-    "communicator": [
-        {
-            "endpoint": {
-                "suite": "tcp/ip",
-                "protocol": "tcp",
-                "server_address": "24.24.24.1",
-                "port": "2222"
-            },
-            "plugins": [
-                "cuda",
-                "cudart",
-                "cublas",
-                "curand",
-                "cudnn",
-                "cufft",
-                "cusolver",
-                "cusparse",
-                "nvrtc",
-                "nvml"
-            ]
-        }
-    ],
-    "secure_application": false
+  "communicator": [
+    {
+      "endpoint": {
+        "suite": "quic/ip",
+        "protocol": "quic",
+        "server_address": "0.0.0.0",
+        "port": "9999"
+      },
+      "plugins": [
+        "cudart",
+        "cublas",
+        "curand",
+        "cudnn"
+      ]
+    }
+  ],
+  "secure_application": true
 }
