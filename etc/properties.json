@@ -4,10 +4,11 @@
       "endpoint": {
         "suite": "quic/ip",
         "protocol": "quic",
-        "server_address": "0.0.0.0",
+        "server_address": "127.0.0.1",
         "port": "9999"
       },
       "plugins": [
+        "cuda",
         "cudart",
         "cublas",
         "curand",

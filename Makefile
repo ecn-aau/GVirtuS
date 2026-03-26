@@ -1,13 +1,5 @@
 .PHONY: docker-build-push-prod docker-build-gvirtus-dependencies run-gvirtus-backend-dev stop-gvirtus attach-gvirtus-bash run-gvirtus-tests docker-build-gvirtus docker-build-openpose run-openpose-test stop-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test stop-2d-human-parsing-test run-simple-matrix-test
 
-docker-build-dev-local:
-	docker buildx build \
-		--platform linux/amd64 \
-		--no-cache \
-		-f docker/dev/Dockerfile \
-		-t gvirtus_backend \
-		.
-
 docker-build-push-prod:
 	docker buildx build \
 		--platform linux/amd64 \
@@ -52,28 +44,6 @@ run-gvirtus-backend-dev:
 stop-gvirtus:
 	docker stop gvirtus || true
 
-run-gvirtus-backend-dev-local:
-	docker run \
-		--rm \
-		-it \
-		--network host \
-		--privileged \
-		-v ./cmake:/gvirtus/cmake/ \
-		-v ./etc:/gvirtus/etc/ \
-		-v ./include:/gvirtus/include/ \
-		-v ./plugins:/gvirtus/plugins/ \
-		-v ./src:/gvirtus/src/ \
-		-v ./tools:/gvirtus/tools/ \
-		-v ./tests:/gvirtus/tests/ \
-		-v ./CMakeLists.txt:/gvirtus/CMakeLists.txt \
-		-v ./docker/dev/entrypoint.sh:/entrypoint.sh \
-		-v ./examples:/gvirtus/examples/ \
-		--entrypoint /entrypoint.sh \
-		--name gvirtus \
-		--runtime=nvidia \
-		--shm-size=8G \
-		gvirtus_backend
-
 attach-gvirtus-bash:
 		docker exec -it gvirtus bash
 
@@ -110,31 +80,6 @@ run-openpose-test:
 		-v ./examples/openpose/properties.json:/opt/GVirtuS/etc/properties.json \
 		-v ./examples/openpose/entrypoint.sh:/entrypoint.sh \
 		openpose_gvirtus:cuda12.6 \
-		bash /entrypoint.sh
-
-docker-build-matrix-mul-test-local:
-	docker buildx build \
-		--platform linux/amd64 \
-		-t matrix-mul \
-		-f ./examples/simple_matrix_local/Dockerfile-local \
-		.
-
-run-matrix-mul-test-local: 
-	docker run \
-		--rm \
-		-it \
-		--network host \
-		--privileged \
-		-v ./cmake:/gvirtus/cmake/ \
-		-v ./etc:/gvirtus/etc/ \
-		-v ./include:/gvirtus/include/ \
-		-v ./plugins:/gvirtus/plugins/ \
-		-v ./src:/gvirtus/src/ \
-		-v ./tools:/gvirtus/tools/ \
-		-v ./tests:/gvirtus/tests/ \
-		-v ./CMakeLists.txt:/gvirtus/CMakeLists.txt \
-		-v ./examples:/gvirtus/examples/ \
-		matrix-mul \
 		bash /entrypoint.sh
 
 stop-openpose-test:

@@ -1,8 +1,8 @@
 #include <iostream>
 #include <cublas_v2.h>
 
-#define N 980 // with 990 it does not work
-#define R 100
+#define N 10 // with 990 it does not work
+#define R 10
 
 int main() {
     // Matrix A (2x3)

@@ -2,10 +2,10 @@
   "communicator": [
     {
       "endpoint": {
-        "suite": "udp/ip",
-        "protocol": "udp",
+        "suite": "quic/ip",
+        "protocol": "quic",
         "server_address": "127.0.0.1",
-        "port": "2222"
+        "port": "9999"
       },
       "plugins": [
         "cuda",
@@ -20,5 +20,5 @@
       ]
     }
   ],
-  "secure_application": false
+  "secure_application": true
 }

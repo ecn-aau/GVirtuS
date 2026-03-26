@@ -53,22 +53,23 @@ Backend::Backend(const fs::path &path) {
 
     // endpoints setup
     LOG4CPLUS_TRACE(logger, "Initializing endpoints setup");
-
     _properties = common::JSON<Property>(path).parser();
     _children.reserve(_properties.endpoints());
-
+    
     LOG4CPLUS_TRACE(logger, "Got properties and reserved children array");
-
+    
     if (_properties.endpoints() > 1)
-        LOG4CPLUS_INFO(logger,
-                       "Application serves on " << _properties.endpoints() << " several endpoint");
-
-    try {
-        for (int i = 0; i < _properties.endpoints(); i++) {
+    LOG4CPLUS_INFO(logger,
+        "Application serves on " << _properties.endpoints() << " several endpoint");
+        
+        try {
+            for (int i = 0; i < _properties.endpoints(); i++) {
+            std::cout << "INCISDE" << std::endl;
             _children.push_back(std::make_unique<Process>(
                 communicators::CommunicatorFactory::get_communicator(
                     communicators::EndpointFactory::get_endpoint(path), _properties.secure()),
                 _properties.plugins().at(i)));
+            std::cout << "After " << _children.size() << std::endl;
         }
         /*
         for (int i = 0; i < _properties.endpoints(); i++) {
@@ -109,7 +110,6 @@ void Backend::Start() {
     LOG4CPLUS_DEBUG(logger, "[Process " << getpid() << "] " << "Backend::Start() called.");
 
     int pid = 0;
-
     // _children definition: "std::vector<std::unique_ptr<Process>> _children"
     for (int i = 0; i < _children.size(); i++) {
         activeChilds++;

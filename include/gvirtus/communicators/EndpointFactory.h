@@ -12,6 +12,7 @@
 #include "Endpoint_Hybrid.h"
 #include "Endpoint_Rdma.h"
 #include "Endpoint_Tcp.h"
+#include "Endpoint_Quic.h"
 
 // #define DEBUG
 
@@ -55,6 +56,10 @@ class EndpointFactory {
             LOG4CPLUS_INFO(logger, "Initializing TCP/IP Endpoint");
             auto end = common::JSON<Endpoint_Tcp>(json_path).parser();
             ptr = std::make_shared<Endpoint_Tcp>(end);
+        } else if (suite == "quic/ip") {
+            LOG4CPLUS_INFO(logger, "Initializing QUIC/IP Endpoint");
+            auto end = common::JSON<Endpoint_Quic>(json_path).parser();
+            ptr = std::make_shared<Endpoint_Quic>(end);
         }
         // infiniband
         else if ("infiniband-rdma" == j["communicator"][ind_endpoint]["endpoint"].at("suite")) {

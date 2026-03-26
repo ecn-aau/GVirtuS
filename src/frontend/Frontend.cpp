@@ -132,7 +132,7 @@ void Frontend::Init(Communicator *c) {
         auto endpoint = EndpointFactory::get_endpoint(config_path);
 
         mpFrontends->find(tid)->second->_communicator =
-            CommunicatorFactory::get_communicator(endpoint);
+            CommunicatorFactory::get_communicator(endpoint, true);
         mpFrontends->find(tid)->second->_communicator->obj_ptr()->Connect();
     } catch (const std::exception &e) {
         LOG4CPLUS_FATAL(logger, fs::path(__FILE__).filename()
