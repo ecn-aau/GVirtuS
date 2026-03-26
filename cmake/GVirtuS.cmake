@@ -13,6 +13,7 @@ include(ExternalProject)
 
 # Set the external install location
 set(EXTERNAL_INSTALL_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/external)
+set(LIBMSQUIC /usr/local/lib/libmsquic.so)
 
 # Include the log4cplus module (downloads or finds it)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/log4cplus.cmake)

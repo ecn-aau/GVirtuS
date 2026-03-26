@@ -84,7 +84,7 @@ bool getstring(Communicator *c, string &s) {
 #endif
 
     // TODO: FIX LISKOV SUBSTITUTION AND DIPENDENCE INVERSION!!!!!
-    if (c->to_string() == "tcpcommunicator") {
+    if (c->to_string() == "tcpcommunicator" || c->to_string() == "quiccommunicator") {
         s = "";
         char ch = 0;
         while (c->Read(&ch, 1) == 1) {

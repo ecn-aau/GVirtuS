@@ -42,7 +42,7 @@
 #endif
 
 #include "gvirtus/communicators/Communicator.h"
-#include "/home/administrator/msquic/src/inc/msquic.h"
+#include "msquic.h"
 
 #include <thread>
 #include <mutex>
@@ -229,7 +229,7 @@ class QuicCommunicator : public Communicator {
 
     
 
-    std::string to_string() override { return "QuicCommunicator"; }
+    std::string to_string() override { return "quiccommunicator"; }
  private:
 
      int write_all_nonblocking(int fd, const void *buf, ssize_t len, int timeout_ms);

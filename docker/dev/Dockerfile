@@ -1,6 +1,9 @@
 FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
 RUN apt update && apt install -y --no-install-recommends \
     build-essential \
+    git \
+    libssl-dev \
+    ca-certificates \
     libxmu-dev \
     libxi-dev \
     libgl-dev \
