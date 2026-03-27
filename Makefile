@@ -1,13 +1,4 @@
-.PHONY: docker-build-push-dev docker-build-push-prod run-gvirtus-backend-dev run-gvirtus-tests stop-gvirtus docker-build-openpose run-openpose-test stop-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test stop-human-parsing-test
-
-docker-build-push-dev:
-	docker buildx build \
-		--platform linux/amd64 \
-		--push \
-		--no-cache \
-		-f docker/dev/Dockerfile \
-		-t taslanidis/gvirtus-dependencies:cuda12.6.3-cudnn-ubuntu22.04 \
-		.
+.PHONY: docker-build-push-prod docker-build-gvirtus-dependencies run-gvirtus-backend-dev stop-gvirtus attach-gvirtus-bash run-gvirtus-tests docker-build-gvirtus docker-build-openpose run-openpose-test stop-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test stop-2d-human-parsing-test run-simple-matrix-test
 
 docker-build-push-prod:
 	docker buildx build \
@@ -18,6 +9,16 @@ docker-build-push-prod:
 		-t taslanidis/gvirtus:cuda12.6.3-cudnn-ubuntu22.04 \
 		.
 
+# For development, we build a base image with all dependencies to speed up iterative testing.
+docker-build-gvirtus-dependencies:
+	docker buildx build \
+		--platform linux/amd64 \
+		--no-cache \
+		-f docker/dev/Dockerfile \
+		-t gvirtus_dependencies:cuda12.6 \
+		.
+
+# Runs the development container with all source code mounted, allowing for fast iteration without rebuilding the image.
 run-gvirtus-backend-dev:
 	docker run \
 		--rm \
@@ -38,7 +39,10 @@ run-gvirtus-backend-dev:
 		--name gvirtus \
 		--runtime=nvidia \
 		--shm-size=8G \
-		tinghui8576/gvirtus-dev:cuda12.6.3-cudnn-ubuntu22.04
+		gvirtus_dependencies:cuda12.6
+
+stop-gvirtus:
+	docker stop gvirtus || true
 
 attach-gvirtus-bash:
 		docker exec -it gvirtus bash
@@ -51,45 +55,43 @@ run-gvirtus-tests:
 			cd /gvirtus/build && \
 			ctest --output-on-failure'
 
-stop-gvirtus:
-	docker stop gvirtus
+# Builds a base image used for frontend examples.
+docker-build-gvirtus:
+	docker buildx build \
+		--platform linux/amd64 \
+		-f docker/dev/Dockerfile.frontend \
+		-t gvirtus:cuda12.6 \
+		.
 
-
+# OpenPose example.
 docker-build-openpose:
 	docker buildx build \
 		--platform linux/amd64 \
-		--push \
-		--no-cache \
 		-f examples/openpose/Dockerfile \
-		-t darsh916/openpose_gvirtus:cuda12.6 \
-		examples/openpose	
-
+		-t openpose_gvirtus:cuda12.6 \
+		examples/openpose
 
 run-openpose-test: 
 	docker run --rm \
-		--name openpose_container \
+		--name openpose_test_container \
 		--network host \
 		-v ./examples/openpose/media:/opt/openpose/examples/media \
 		-v ./examples/openpose:/opt/openpose/examples/gvirtus \
 		-v ./examples/openpose/properties.json:/opt/GVirtuS/etc/properties.json \
 		-v ./examples/openpose/entrypoint.sh:/entrypoint.sh \
-		darsh916/openpose_gvirtus:cuda12.6 \
+		openpose_gvirtus:cuda12.6 \
 		bash /entrypoint.sh
 
 stop-openpose-test:
 	docker stop openpose_test_container || true
 
-
-
+# 2D Human Parsing example.
 docker-build-2d-human-parsing:
 	docker buildx build \
 		--platform linux/amd64 \
-		--push \
-		--no-cache \
 		-f examples/2d-human-parsing/Dockerfile \
-		-t darsh916/human-parsing_gvirtus:cuda12.6 \
+		-t human-parsing_gvirtus:cuda12.6 \
 		examples/2d-human-parsing	
-
 
 run-2d-human-parsing-test: 
 	docker run --rm \
@@ -100,8 +102,21 @@ run-2d-human-parsing-test:
 		-v ./examples/2d-human-parsing/demo_imgs:/opt/2D-Human-Parsing/demo_imgs \
 		-v ./examples/2d-human-parsing/properties.json:/opt/GVirtuS/etc/properties.json \
 		-v ./examples/2d-human-parsing/entrypoint.sh:/entrypoint.sh \
-		darsh916/human-parsing_gvirtus:cuda12.6 \
+		human-parsing_gvirtus:cuda12.6 \
 		bash /entrypoint.sh
 
 stop-2d-human-parsing-test:
-	docker stop human-parsing_test_container || true
+	docker stop human_parsing_test_container || true
+
+# Simple Matrix example.
+run-simple-matrix-test:
+	docker run \
+		--rm \
+		-it \
+		--name simple_matrix_test_container \
+		--network host \
+		-v ./examples/simple_matrix/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/simple_matrix:/opt/GVirtuS/examples/simple_matrix \
+		-v ./examples/simple_matrix/frontend.sh:/opt/GVirtuS/frontend.sh \
+		gvirtus:cuda12.6 \
+		bash /opt/GVirtuS/frontend.sh

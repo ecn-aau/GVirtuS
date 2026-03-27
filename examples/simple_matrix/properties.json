@@ -1,0 +1,24 @@
+{
+  "communicator": [
+    {
+      "endpoint": {
+        "suite": "tcp/ip",
+        "protocol": "tcp",
+        "server_address": "127.0.0.1",
+        "port": "2222"
+      },
+      "plugins": [
+        "cuda",
+        "cudart",
+        "cublas",
+        "curand",
+        "cudnn",
+        "cufft",
+        "cusolver",
+        "cusparse",
+        "nvrtc"
+      ]
+    }
+  ],
+  "secure_application": false
+}

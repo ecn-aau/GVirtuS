@@ -1,10 +1,10 @@
-FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
+# ===========================================================================
+# Stage 1: Build OpenPose, cached independently of GVirtuS.
+# ===========================================================================
+FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04 AS openpose-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV GVIRTUS_HOME=/opt/GVirtuS
 ENV OPENPOSE_HOME=/opt/openpose
-ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${GVIRTUS_HOME}/lib/frontend:${LD_LIBRARY_PATH}
-
 
 # Prevent tzdata prompt and install dependencies
 RUN ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
@@ -33,28 +33,12 @@ RUN ln -fs /usr/share/zoneinfo/Etc/UTC /etc/localtime && \
     python3-dev \
     python3-pip \
     python3-setuptools \
-    libxmu-dev \
-    libxi-dev \
-    libgl-dev \
-    libosmesa-dev \
-    liblog4cplus-dev \
-    librdmacm-dev \
-    libibverbs-dev \
-    libgtest-dev \
-    liblz4-dev \
     cmake \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # # Install Python packages
 RUN pip3 install opencv-python
-
-# # Clone and build GVirtuS
-WORKDIR /opt
-RUN git clone https://github.com/ecn-aau/GVirtuS.git && \
-    cd GVirtuS && mkdir build && cd build && \
-    cmake -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} .. && \
-    make -j$(nproc) && make install
 
 # Clone and build OpenPose
 WORKDIR /opt
@@ -67,7 +51,7 @@ COPY cmake/Cuda.cmake ${OPENPOSE_HOME}/cmake/Cuda.cmake
 COPY caffe/ ${OPENPOSE_HOME}/3rdparty/caffe/
 
 # Optional: Copy models directory if needed
-# COPY models/ ${OPENPOSE_HOME}/models/
+COPY models/ ${OPENPOSE_HOME}/models/
 
 WORKDIR ${OPENPOSE_HOME}/build
 RUN cmake .. \
@@ -77,7 +61,38 @@ RUN cmake .. \
     -DBUILD_DOCS=OFF \
     -DBUILD_TESTS=OFF \
     -DCUDA_USE_STATIC_CUDA_RUNTIME=OFF \
-    -DCUDA_INCLUDE_DIRS="${GVIRTUS_HOME}/include;/usr/local/cuda-12.6/include" \
-    -DCMAKE_CXX_FLAGS="-L${GVIRTUS_HOME}/lib -L${GVIRTUS_HOME}/lib/frontend" \
     && make -j"$(nproc)"
+
+# ===========================================================================
+# Final stage: layer OpenPose on top of frontend_base.
+# ===========================================================================
+FROM gvirtus:cuda12.6 AS final
+
+ENV OPENPOSE_HOME=/opt/openpose
+ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${GVIRTUS_HOME}/lib/frontend:${LD_LIBRARY_PATH}
+
+# Install OpenPose (and Caffe) runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libprotobuf-dev \
+    protobuf-compiler \
+    libgoogle-glog-dev \
+    libgflags-dev \
+    libatlas-base-dev \
+    libboost-all-dev \
+    libhdf5-dev \
+    libleveldb-dev \
+    libsnappy-dev \
+    libopencv-dev \
+    libopenblas-dev \
+    liblmdb-dev \
+    python3-pip \
+    python-is-python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install opencv-python
+
+# Copy pre-built OpenPose from stage 1 — no recompilation needed.
+COPY --from=openpose-builder /opt/openpose /opt/openpose
+
+WORKDIR /opt/openpose
 

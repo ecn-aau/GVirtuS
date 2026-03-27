@@ -14,7 +14,7 @@ You can view the full list of all GVirtuS published papers in [CITATIONS](CITATI
 
 **Tested OS**: Ubuntu 22.04 LTS
 
-Before proceeding, ensure the following dependencies are installed on your system:
+Before proceeding, ensure the following dependencies are installed on your system (consider using the [installation script](docs/install_nvidia_cuda_cudnn.sh)):
 
 * `gcc` compiler and toolchain: _Tested with **v11.4.0** (latest verified working version)_
 
@@ -29,20 +29,6 @@ Before proceeding, ensure the following dependencies are installed on your syste
 > [!NOTE]
 > **CUDA Drivers**, **CUDA Toolkit**, and **cuDNN** only need to be installed on the **host machine** running the **GVirtuS backend**.
 > Machines acting as **frontends** do **not** require these installations.
-
-## 📦 Installation
-
-1) `git clone` the **GVirtuS** main repository: 
-
-```   
-git clone https://github.com/ecn-aau/GVirtuS.git
-```
-
-2) CD into the repo directory:
-
-```
-cd GVirtuS
-```
 
 # 📊 GVirtuS Implementation Status
 
@@ -63,10 +49,79 @@ To test GVirtuS, follow the steps below. This setup runs the GVirtuS backend ins
 Use the script below to start the GVirtuS backend. It builds GVirtuS from source inside a Docker container and launches the backend process:
 
 ```
+make docker-build-gvirtus-dependencies
 make run-gvirtus-backend-dev
 ```
 
-**2. Run the Tests**
+> **Note**:
+>
+> * Before running the application, ensure that the `properties.json` configuration file on the backend & frontend devices contains the correct **IP address**, **port**, and **endpoint suite** of the backend.
+
+### Case 1: Distributed Setup (Different Devices)
+
+If the **GVirtuS backend** is running on a GPU server (or edge device) and the **frontend** is on a different non-GPU device:
+
+* Update the **frontend configuration file** with the backend’s IP and port.
+
+* E.i for OpenPose modify {ROOT_FOLDER}/GVirtuS/examples/openpose/properties.json and {ROOT_FOLDER}/GVirtuS/etc/properties.json
+Example configuration: 
+
+  ```json
+  {
+      "suite": "tcp/ip",
+      "protocol": "tcp",
+      "server_address": "130.225.243.38",
+      "port": "8888"
+  }
+  ```
+
+---
+
+### Case 2: Local Setup (Same Device)
+
+If both the **GVirtuS backend** and **frontend** are running on the **same server or edge device**:
+
+* No need to find the external IP address.
+
+* Instead, set the server address to **127.0.0.1**:
+
+  ```json
+  {
+      "suite": "tcp/ip",
+      "protocol": "tcp",
+      "server_address": "127.0.0.1",
+      "port": "8888"
+  }
+  ```
+
+---
+
+**2. Run the examples**
+
+Build the GVirtuS base to use for the examples
+
+```
+docker-build-gvirtus
+```
+
+### Simple matrix example
+```
+make run-simple-matrix-test
+```
+
+### 2D Human parsing example
+```
+make docker-build-2d-human-parsing
+make run-2d-human-parsing-test
+```
+
+### OpenPose example
+```
+make docker-build-openpose
+make run-openpose-test
+```
+
+**3. Run the Tests**
 
 Once the backend is running, you can run the tests using the following script. This script creates a new process inside the same container that acts as the frontend and runs all test files located in the tests/ directory:
 
@@ -74,7 +129,7 @@ Once the backend is running, you can run the tests using the following script. T
 make run-gvirtus-tests
 ```
 
-**3. Adding Tests**
+**4. Adding Tests**
 
 To add new tests, simply place your test code in any existing .cu file inside the tests directory. You can also create new .cu files if you wish; just make sure to include them as source files in [tests/CMakeLists.txt](tests/CMakeLists.txt#L32).
 
@@ -91,120 +146,7 @@ make stop-gvirtus
 Ensure your changes are saved.
 
 Restart the backend and re-run the tests using the scripts above.
-
 ---
-
-> [!NOTE]
-> The GVirtuS backend and frontend communicate over localhost (127.0.0.1), so both processes must run on the same machine.
-
-> [!NOTE]
-> The `make run-gvirtus-backend-dev` command starts a Docker container with all necessary GVirtuS dependencies and mounts your local repository files required. This means your local changes are automatically used inside the container, making development and testing fast and efficient—no need to git push or docker push. The `make run-gvirtus-tests` command does **not** start a new container. Instead, it opens a new shell inside the already running backend container and executes the GVirtuS tests there.
-
-> [!IMPORTANT]
-> If you make **any changes** to the test files, you must restart the GVirtuS backend using `make stop-gvirtus` followed by `make run-gvirtus-backend-dev`. Otherwise, your test changes will not be picked up.
-
---- 
-
-# 📦 GVirtuS–OpenPose Integration
-
-The below instructions explains how to set up and run **OpenPose integrated with GVirtuS**, enabling CUDA workloads to be executed on a backend GPU server while running the application on a non-GPU frontend device.
-
----
-
-## 🚀 Setup Instructions
-
-### 1. Clone the GVirtuS Repository
-
-Clone the GVirtuS project:
-
-```bash
-git clone https://github.com/ecn-aau/GVirtuS.git
-```
-
-### 2. Navigate into the Repository
-
-```bash
-cd GVirtuS
-```
-
-### 3. Start the GVirtuS Backend
-
-Launch the backend service on the GPU-enabled device:
-
-```bash
-make run-gvirtus-backend-dev
-```
-
-> **Note**:
->
-> * Before running the OpenPose–GVirtuS integrated application on a **frontend (non-GPU) device**, ensure that the `properties.json` configuration file in the frontend contains the correct **IP address**, **port**, and **endpoint suite** of the backend.
-
-### Case 1: Distributed Setup (Different Devices)
-
-If the **GVirtuS backend** is running on a GPU server (or edge device) and the **frontend** is on a different non-GPU device:
-
-* Update the **frontend configuration file** with the backend’s IP and port.
-* File to update:
-
-  ```
-  {ROOT_FOLDER}/GVirtuS/examples/openpose/properties.json
-  ```
-
-Here, the {ROOT_FOLDER} would be your Present Working Directory(PWD) where GVirtuS repo has been installed (ex: home/darshan)
-
-* Get the backend device’s IP address using "ifconfig" command on Backend device.
-
-* Modify {ROOT_FOLDER}/GVirtuS/examples/openpose/properties.json 
-Example configuration: 
-
-  ```json
-  {
-      "suite": "tcp/ip",                   // Replace rdma-roce if you're using rdma
-      "protocol": "tcp",                   // Replace roce if you're using rdma
-      "server_address": "130.225.243.38",    //Replace with Backend device IP
-      "port": "8888"
-  }
-  ```
-
----
-
-### Case 2: Local Setup (Same Device)
-
-If both the **GVirtuS backend** and **frontend** are running on the **same server or edge device**:
-
-* No need to find the external IP address.
-
-* Instead, set the server address to **127.0.0.1** in:
-
-  ```
-  {ROOT_FOLDER}/GVirtuS/examples/openpose/properties.json
-  ```
-
-* Example configuration:
-
-  ```json
-  {
-      "suite": "tcp/ip",                        // Replace rdma-roce if you're using rdma
-      "protocol": "tcp",                        // Replace roce if you're using rdma
-      "server_address": "127.0.0.1",
-      "port": "8888"
-  }
-  ```
-
----
-
-### 4. Run the OpenPose–GVirtuS Demo Application
-
-On the frontend device, start the integrated OpenPose application:
-
-```bash
-make run-openpose-test
-```
-
-This will connect to the GVirtuS backend component, **transparently redirect all CUDA calls** to the GPU-enabled backend system, and return the results to the frontend application.
-
----
-
 
 # ⚠️ Disclaimers
 

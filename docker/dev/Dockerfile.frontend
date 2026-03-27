@@ -1,0 +1,34 @@
+FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV GVIRTUS_HOME=/opt/GVirtuS
+
+RUN apt update && apt install -y --no-install-recommends \
+    build-essential \
+    libxmu-dev \
+    libxi-dev \
+    libgl-dev \
+    libosmesa-dev \
+    liblog4cplus-dev \
+    librdmacm-dev \
+    libibverbs-dev \
+    libgtest-dev \
+    liblz4-dev \
+    cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY ./src/ ${GVIRTUS_HOME}/src/
+COPY ./include/ ${GVIRTUS_HOME}/include/
+COPY ./etc/ ${GVIRTUS_HOME}/etc/
+COPY ./cmake/ ${GVIRTUS_HOME}/cmake/
+COPY ./lib/ ${GVIRTUS_HOME}/lib/
+COPY ./plugins/ ${GVIRTUS_HOME}/plugins/
+COPY ./tests/ ${GVIRTUS_HOME}/tests/
+COPY ./CMakeLists.txt ${GVIRTUS_HOME}/CMakeLists.txt
+
+WORKDIR /opt/GVirtuS
+RUN cmake -B build -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} && \
+    cd build && \
+    make -j$(nproc) && make install
+
+WORKDIR /opt/GVirtuS
