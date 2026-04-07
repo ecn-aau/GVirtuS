@@ -5,6 +5,9 @@ ENV GVIRTUS_HOME=/opt/GVirtuS
 
 RUN apt update && apt install -y --no-install-recommends \
     build-essential \
+    git \
+    libssl-dev \
+    ca-certificates \
     libxmu-dev \
     libxi-dev \
     libgl-dev \
@@ -26,9 +29,23 @@ COPY ./plugins/ ${GVIRTUS_HOME}/plugins/
 COPY ./tests/ ${GVIRTUS_HOME}/tests/
 COPY ./CMakeLists.txt ${GVIRTUS_HOME}/CMakeLists.txt
 
-WORKDIR /opt/GVirtuS
-RUN cmake -B build -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} && \
-    cd build && \
-    make -j$(nproc) && make install
+# Clone MsQuic
+RUN git clone --recurse-submodules https://github.com/microsoft/msquic.git && \
+    cd msquic && \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build && \
+    cmake --install build
+    
 
-WORKDIR /opt/GVirtuS
+# ---- Ensure runtime linker can find libmsquic ----
+RUN echo "/usr/local/lib" > /etc/ld.so.conf.d/msquic.conf && ldconfig
+
+# Optional: sanity check (helps debugging builds)
+RUN ldconfig -p | grep msquic || true
+
+# WORKDIR /opt/GVirtuS
+# RUN cmake -B build -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} && \
+#     cd build && \
+#     make -j$(nproc) && make install
+
+# WORKDIR /opt/GVirtuS

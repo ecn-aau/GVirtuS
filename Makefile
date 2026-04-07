@@ -118,5 +118,13 @@ run-simple-matrix-test:
 		-v ./examples/simple_matrix/properties.json:/opt/GVirtuS/etc/properties.json \
 		-v ./examples/simple_matrix:/opt/GVirtuS/examples/simple_matrix \
 		-v ./examples/simple_matrix/frontend.sh:/opt/GVirtuS/frontend.sh \
+		-v ./cmake:/gvirtus/cmake/ \
+		-v ./etc:/gvirtus/etc/ \
+		-v ./include:/gvirtus/include/ \
+		-v ./plugins:/gvirtus/plugins/ \
+		-v ./src:/gvirtus/src/ \
+		-v ./tools:/gvirtus/tools/ \
+		-v ./tests:/gvirtus/tests/ \
+		-v ./CMakeLists.txt:/gvirtus/CMakeLists.txt \
 		gvirtus:cuda12.6 \
 		bash /opt/GVirtuS/frontend.sh

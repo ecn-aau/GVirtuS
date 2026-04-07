@@ -12,7 +12,12 @@
         "cudart",
         "cublas",
         "curand",
-        "cudnn"
+        "cudnn",
+        "cufft",
+        "cusolver",
+        "cusparse",
+        "nvrtc",
+        "nvml"
       ]
     }
   ],
