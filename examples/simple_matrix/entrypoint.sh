@@ -3,6 +3,12 @@ set -e  # Exit immediately if a command fails
 
 # --- Set environment variables ---
 export GVIRTUS_HOME=/opt/GVirtuS
+export GVIRTUS_LOGLEVEL=60000
+echo ${GVIRTUS_HOME}
+ls
+mkdir gvirtus/build && cd gvirtus/build && cmake .. && make -j$(nproc) && make install
+
+
 export EXTRA_NVCCFLAGS='--cudart=shared'
 export GVIRTUS_LOGLEVEL=10000
 export LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${GVIRTUS_HOME}/lib/frontend:${LD_LIBRARY_PATH}

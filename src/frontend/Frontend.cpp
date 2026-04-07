@@ -168,8 +168,9 @@ Frontend::~Frontend() {
                           << it->second->mDataReceived / (1024 * 1024.0) << " Mb(s) in "
                           << it->second->mReceivingTime << " second(s)\n";
             }
-
-            delete it->second;
+            if (it->first != tid) {
+                delete it->second;
+            }
             it = mpFrontends->erase(it);
         }
 
@@ -313,6 +314,9 @@ void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
             hybrid->end_call();
         }
     }
+
+    std::cout << "[GVIRTUS] Routine '" << routine << "' executed with exit code " << exit_code
+              << " in " << server_exec_sec << " second(s)\n";
 }
 
 void Frontend::Prepare() {

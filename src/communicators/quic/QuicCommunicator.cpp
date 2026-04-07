@@ -941,7 +941,7 @@ const gvirtus::communicators::Communicator *const QuicCommunicator::Accept() con
         printf("QuicCommunicator::Accept() returned\n");
 
     }
-    std::unique_lock<std::mutex> slock(StreamMutex);
+    std::unique_lock<std::mutex> slock(StreamMutex);    
     DEBUG_PRINTF("Wait for Stream\n");
     StreamStartCv.wait(slock, [this] { return (!NewQuicCommunicatorQueue.empty() || StreamEventOccurred); });
     DEBUG_PRINTF("New Stream\n");
@@ -1019,7 +1019,7 @@ void QuicCommunicator::Connect() {
         // Start the connection to the server.
         //
         if (QUIC_FAILED(Status = MsQuic->ConnectionStart(QuicCommunicator::Connection, Configuration, QUIC_ADDRESS_FAMILY_UNSPEC, mHostname.data(), htons(mPort)))) {
-            //printf("ConnectionStart failed, 0x%x!\n", Status);
+            printf("ConnectionStart failed, 0x%x!\n", Status);
             //goto Error;
             throw "ConnectionStart failed";
         }
