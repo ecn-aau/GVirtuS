@@ -19,9 +19,14 @@ function(configure_cudadr_plugin)
 
     include_directories(${CUDADR_INCLUDE_DIRECTORY} ${CUDA_INCLUDE_DIRS})
 
+    # Also search CUDA stubs so the plugin builds inside Docker (no real driver present).
     find_library(CUDADR_LIBRARY
         cuda
-        PATHS ${CUDA_LIBRARIES_PATH})
+        PATHS
+            ${CUDA_LIBRARIES_PATH}
+            /usr/local/cuda/lib64/stubs
+            /usr/local/cuda-12.6/targets/x86_64-linux/lib/stubs
+            /usr/local/cuda/targets/x86_64-linux/lib/stubs)
 
     if(NOT CUDADR_LIBRARY)
         message(WARNING "cudaDr library not found, skipping plugins/cudadr")
@@ -30,19 +35,19 @@ function(configure_cudadr_plugin)
 
     message(STATUS "cudaDr library found at ${CUDADR_LIBRARY}, adding plugins/cudadr")
 
-    set(CUDADR_VERSION "${CUDADR_LIBRARY}")
-    while(IS_SYMLINK "${CUDADR_VERSION}")
-        message(STATUS "${CUDADR_VERSION}")
-        execute_process(COMMAND readlink "${CUDADR_VERSION}"
-            OUTPUT_VARIABLE CUDADR_VERSION
+    set(CUDADR_BACKEND_VERSION "${CUDADR_LIBRARY}")
+    while(IS_SYMLINK "${CUDADR_BACKEND_VERSION}")
+        message(STATUS "${CUDADR_BACKEND_VERSION}")
+        execute_process(COMMAND readlink "${CUDADR_BACKEND_VERSION}"
+            OUTPUT_VARIABLE CUDADR_BACKEND_VERSION
             OUTPUT_STRIP_TRAILING_WHITESPACE
         )
     endwhile()
-    message(STATUS "Resolved CUDADR version: ${CUDADR_VERSION}")
-    string(REGEX REPLACE ".*\\.so\\.([0-9]+(\\.[0-9]+)*)" "\\1" CUDADR_VERSION "${CUDADR_VERSION}")
+    message(STATUS "Resolved CUDADR version: ${CUDADR_BACKEND_VERSION}")
+    string(REGEX REPLACE ".*\\.so\\.([0-9]+(\\.[0-9]+)*)" "\\1" CUDADR_BACKEND_VERSION "${CUDADR_BACKEND_VERSION}")
 
 
-    gvirtus_add_backend(cuda ${CUDADR_VERSION}
+    gvirtus_add_backend(cuda ${CUDADR_BACKEND_VERSION}
         backend/CudaDrHandler_context.cpp
         backend/CudaDrHandler_device.cpp
         backend/CudaDrHandler_driver_entry_point.cpp
@@ -65,7 +70,9 @@ function(configure_cudadr_plugin)
 
     target_link_libraries(${PROJECT_NAME} ${CUDADR_LIBRARY})
 
-    gvirtus_add_frontend(cuda ${CUDADR_VERSION}
+    # libcuda.so always uses soversion 1 (libcuda.so.1) regardless of driver version.
+    # This matches the soname PyTorch and other consumers look for via dlopen.
+    gvirtus_add_frontend(cuda 1
         frontend/CudaDr_context.cpp
         frontend/CudaDr_device.cpp
         frontend/CudaDr_driver_entry_point.cpp

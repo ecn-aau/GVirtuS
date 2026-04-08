@@ -202,6 +202,7 @@ CUDA_ROUTINE_HANDLER(FuncGetAttributes);
 CUDA_ROUTINE_HANDLER(FuncSetCacheConfig);
 CUDA_ROUTINE_HANDLER(Launch);
 CUDA_ROUTINE_HANDLER(LaunchKernel);
+CUDA_ROUTINE_HANDLER(LaunchCooperativeKernel);
 CUDA_ROUTINE_HANDLER(SetDoubleForDevice);
 CUDA_ROUTINE_HANDLER(SetDoubleForHost);
 CUDA_ROUTINE_HANDLER(SetupArgument);
@@ -287,6 +288,7 @@ CUDA_ROUTINE_HANDLER(GraphInstantiate);
 CUDA_ROUTINE_HANDLER(GraphInstantiateWithFlags);
 CUDA_ROUTINE_HANDLER(GraphExecDestroy);
 CUDA_ROUTINE_HANDLER(GraphUpload);
+CUDA_ROUTINE_HANDLER(GraphNodeGetDependencies);
 
 /* CudaRtHandler_version */
 CUDA_ROUTINE_HANDLER(DriverGetVersion);
