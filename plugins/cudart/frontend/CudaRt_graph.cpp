@@ -136,3 +136,17 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaGraphUpload(cudaGraphExec_t graphE
     
     return CudaRtFrontend::GetExitCode();
 }
+
+extern "C" __host__ cudaError_t CUDARTAPI cudaGraphNodeGetDependencies(cudaGraphNode_t node,
+                                                                       cudaGraphNode_t *pDependencies,
+                                                                       size_t *pNumDependencies) {
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::AddDevicePointerForArguments(node);
+    CudaRtFrontend::AddHostPointerForArguments(pDependencies);
+    CudaRtFrontend::Execute("cudaGraphNodeGetDependencies");
+
+    if (CudaRtFrontend::Success()) {
+        *pNumDependencies = CudaRtFrontend::GetOutputVariable<size_t>();
+    }
+    return CudaRtFrontend::GetExitCode();
+}

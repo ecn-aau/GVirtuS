@@ -282,6 +282,7 @@ void CudaRtHandler::Initialize() {
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(PushCallConfiguration));
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(PopCallConfiguration));
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(LaunchKernel));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(LaunchCooperativeKernel));
     /* CudaRtHandler_internal */
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(RegisterFatBinary));
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(RegisterFatBinaryEnd));
@@ -359,6 +360,7 @@ void CudaRtHandler::Initialize() {
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphInstantiateWithFlags));
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphExecDestroy));
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphUpload));
+    mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(GraphNodeGetDependencies));
 
     /* CudaRtHandler_version */
     mspHandlers->insert(CUDA_ROUTINE_HANDLER_PAIR(DriverGetVersion));
