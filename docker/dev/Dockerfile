@@ -15,6 +15,15 @@ RUN apt update && apt install -y --no-install-recommends \
     libgtest-dev \
     liblz4-dev \
     cmake \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG MSQUIC_VERSION=2.5.6
+RUN wget -q https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb \
+    && dpkg -i packages-microsoft-prod.deb \
+    && rm packages-microsoft-prod.deb \
+    && apt update \
+    && apt install -y --no-install-recommends libmsquic=${MSQUIC_VERSION} \
     && rm -rf /var/lib/apt/lists/*
 
 ENV GVIRTUS_HOME=/usr/local/gvirtus
