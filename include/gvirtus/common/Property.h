@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace gvirtus::backend {
+namespace gvirtus::common {
 /**
  * Property class.
  * This class is a model to represent the properties of the backend.
@@ -70,4 +70,4 @@ inline void from_json(const nlohmann::json &j, Property &p) {
     p.endpoints(ends);
     p.secure(j["secure_application"].get<bool>());
 }
-}  // namespace gvirtus::backend
+}  // namespace gvirtus::common

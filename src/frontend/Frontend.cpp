@@ -51,6 +51,7 @@
 #include "log4cplus/configurator.h"
 #include "log4cplus/logger.h"
 #include "log4cplus/loggingmacros.h"
+#include "gvirtus/common/Property.h"
 
 using std::chrono::duration_cast;
 using std::chrono::milliseconds;
@@ -121,8 +122,11 @@ void Frontend::Init(Communicator *c) {
 
     try {
         auto endpoint = EndpointFactory::get_endpoint(config_path);
+        gvirtus::common::Property _properties = common::JSON<gvirtus::common::Property>(config_path).parser();
 
-        this->_communicator = CommunicatorFactory::get_communicator(endpoint);
+
+        
+        this->_communicator = CommunicatorFactory::get_communicator(endpoint, _properties.secure());
         this->_communicator->obj_ptr()->Connect();
     } catch (const std::exception &e) {
         LOG4CPLUS_FATAL(logger, fs::path(__FILE__).filename()

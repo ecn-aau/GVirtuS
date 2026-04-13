@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "Process.h"
-#include "Property.h"
+#include "gvirtus/common/Property.h"
 #include "log4cplus/configurator.h"
 #include "log4cplus/logger.h"
 #include "log4cplus/loggingmacros.h"
@@ -41,7 +41,7 @@ class Backend : public common::Observer {
 
    private:
     std::vector<std::unique_ptr<Process>> _children;
-    Property _properties;
+    common::Property _properties;
     log4cplus::Logger logger;
 };
 }  // namespace gvirtus::backend

@@ -53,8 +53,7 @@ Backend::Backend(const fs::path &path) {
 
     // endpoints setup
     LOG4CPLUS_TRACE(logger, "Initializing endpoints setup");
-
-    _properties = common::JSON<Property>(path).parser();
+    _properties = common::JSON<common::Property>(path).parser();
     _children.reserve(_properties.endpoints());
 
     LOG4CPLUS_TRACE(logger, "Got properties and reserved children array");

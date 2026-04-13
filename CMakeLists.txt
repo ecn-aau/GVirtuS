@@ -56,6 +56,7 @@ add_library(gvirtus-common SHARED
     src/common/SignalException.cpp
     src/common/SignalState.cpp
     src/common/Util.cpp
+    src/common/Property.cpp
 )
 target_link_libraries(gvirtus-common stdc++fs ${CMAKE_DL_LIBS} ${LIBLOG4CPLUS} rdmacm ibverbs)
 
@@ -141,7 +142,6 @@ add_executable(gvirtus-backend
     src/backend/Backend.cpp
     src/backend/main.cpp
     src/backend/Process.cpp
-    src/backend/Property.cpp
 )
 target_include_directories(gvirtus-backend
     PRIVATE

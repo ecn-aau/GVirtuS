@@ -13,7 +13,7 @@
 #include <gvirtus/communicators/Communicator.h>
 #include <gvirtus/communicators/CommunicatorFactory.h>
 #include <gvirtus/communicators/EndpointFactory.h>
-#include <gvirtus/backend/Property.h>
+#include <gvirtus/common/Property.h>
 
 //using gvirtus::communicators::Communicator;
 //using gvirtus::communicators::CommunicatorFactory;
@@ -39,7 +39,7 @@ class CommunicatorTest {
         std::shared_ptr<communicators::Buffer> mpInputBuffer;
         std::shared_ptr<communicators::Buffer> mpOutputBuffer;
         std::shared_ptr<communicators::Buffer> mpLaunchBuffer;
-        backend::Property _properties;
+        common::Property _properties;
         int array_size;
 
 };

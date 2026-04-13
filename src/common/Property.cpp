@@ -18,11 +18,11 @@
  *             Department of Applied Science
  */
 
-#include "gvirtus/backend/Property.h"
+#include "gvirtus/common/Property.h"
 
 #include <iostream>
 
-using gvirtus::backend::Property;
+using gvirtus::common::Property;
 
 Property &Property::endpoints(const int endpoints) {
     this->_endpoints = endpoints;

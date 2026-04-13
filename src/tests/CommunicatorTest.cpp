@@ -8,7 +8,7 @@ using gvirtus::tests::CommunicatorTest;
         c=NULL;
         const std::string config_path="../etc/properties.json";
         const fs::path &path = config_path;
-        _properties = common::JSON<gvirtus::backend::Property>(config_path).parser();
+        _properties = common::JSON<gvirtus::common::Property>(config_path).parser();
         _communicator = communicators::CommunicatorFactory::get_communicator(communicators::EndpointFactory::get_endpoint(config_path.c_str()), _properties.secure());
         array_size = 4000000;
     }
