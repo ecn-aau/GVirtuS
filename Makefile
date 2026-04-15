@@ -108,3 +108,19 @@ run-simple-matrix-test:
 		-v ./examples/simple_matrix/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
 		gvirtus:cuda12.6 \
 		bash /opt/GVirtuS/entrypoint.sh
+
+# Simple Matrix example.
+run-simple-matrix-paper-test:
+	docker run \
+		--rm \
+		-it \
+		--name simple_matrix_test_paper_container \
+		--network host \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
+		-v ./examples/simple_matrix_paper/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/simple_matrix_paper:/opt/GVirtuS/examples/simple_matrix_paper \
+		-v ./examples/simple_matrix_paper/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
+		gvirtus:cuda12.6 \
+		bash /opt/GVirtuS/entrypoint.sh

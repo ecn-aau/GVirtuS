@@ -252,7 +252,7 @@ class QuicCommunicator : public Communicator {
 
 
 
-    static inline HQUIC Connection = nullptr;
+    HQUIC Connection = nullptr;
     static inline const QUIC_API_TABLE* MsQuic = nullptr;
     HQUIC Registration;
     HQUIC Configuration;
