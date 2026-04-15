@@ -35,7 +35,8 @@ COPY ./tests/ ${GVIRTUS_HOME}/tests/
 COPY ./CMakeLists.txt ${GVIRTUS_HOME}/CMakeLists.txt
 
 WORKDIR ${GVIRTUS_HOME}
-RUN cmake -B build -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} && \
+RUN cmake -B build -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} \
+    -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda-12.6/targets/x86_64-linux/lib/stubs -L/usr/local/cuda/lib64/stubs" && \
     cd build && \
     make -j$(nproc) && make install
 

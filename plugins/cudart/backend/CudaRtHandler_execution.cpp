@@ -120,6 +120,37 @@ CUDA_ROUTINE_HANDLER(LaunchKernel) {
     return std::make_shared<Result>(exit_code);
 }
 
+CUDA_ROUTINE_HANDLER(LaunchCooperativeKernel) {
+    void *func = input_buffer->GetFromMarshal<void *>();
+    dim3 gridDim = input_buffer->Get<dim3>();
+    dim3 blockDim = input_buffer->Get<dim3>();
+    size_t sharedMem = input_buffer->Get<size_t>();
+    cudaStream_t stream = input_buffer->Get<cudaStream_t>();
+
+    std::string deviceFunc = pThis->getDeviceFunc(func);
+    NvInfoFunction infoFunction = pThis->getInfoFunc(deviceFunc);
+
+    size_t argsSize = 0;
+    for (const NvInfoKParam &p : infoFunction.params) {
+        size_t end = p.offset + p.size_bytes();
+        if (end > argsSize) {
+            argsSize = end;
+        }
+    }
+
+    byte *pArgs = input_buffer->Assign<byte>(argsSize);
+
+    void *args[infoFunction.params.size()];
+    for (NvInfoKParam infoKParam : infoFunction.params) {
+        args[infoKParam.ordinal] = (void *)(pArgs + infoKParam.offset);
+    }
+
+    cudaError_t exit_code =
+        cudaLaunchCooperativeKernel(func, gridDim, blockDim, args, sharedMem, stream);
+    LOG4CPLUS_DEBUG(pThis->GetLogger(), "LaunchCooperativeKernel exit_code: " << exit_code);
+    return std::make_shared<Result>(exit_code);
+}
+
 CUDA_ROUTINE_HANDLER(Launch) {
     int ctrl;
     void *pointer;

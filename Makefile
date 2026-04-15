@@ -70,6 +70,7 @@ run-openpose-test:
 docker-build-2d-human-parsing:
 	docker buildx build \
 		--platform linux/amd64 \
+		--no-cache \
 		-f examples/2d-human-parsing/Dockerfile \
 		-t human-parsing_gvirtus:cuda12.6 \
 		examples/2d-human-parsing	

@@ -212,3 +212,37 @@ extern "C" __host__ cudaError_t cudaLaunchKernel(const void *func, dim3 gridDim,
     free(pArgsPayload);
     return CudaRtFrontend::GetExitCode();
 }
+
+extern "C" __host__ cudaError_t cudaLaunchCooperativeKernel(const void *func, dim3 gridDim,
+                                                            dim3 blockDim, void **args,
+                                                            size_t sharedMem,
+                                                            cudaStream_t stream) {
+    CudaRtFrontend::Prepare();
+    CudaRtFrontend::AddDevicePointerForArguments(func);
+    CudaRtFrontend::AddVariableForArguments(gridDim);
+    CudaRtFrontend::AddVariableForArguments(blockDim);
+    CudaRtFrontend::AddVariableForArguments(sharedMem);
+    CudaRtFrontend::AddDevicePointerForArguments(stream);
+
+    std::string deviceFunc = CudaRtFrontend::getDeviceFunc(func);
+    NvInfoFunction infoFunction = CudaRtFrontend::getInfoFunc(deviceFunc);
+
+    size_t argsPayloadSize = 0;
+    for (const NvInfoKParam &p : infoFunction.params) {
+        size_t end = p.offset + p.size_bytes();
+        if (end > argsPayloadSize) {
+            argsPayloadSize = end;
+        }
+    }
+
+    byte *pArgsPayload = (byte *)calloc(argsPayloadSize, 1);
+    for (NvInfoKParam infoKParam : infoFunction.params) {
+        memcpy(pArgsPayload + infoKParam.offset, args[infoKParam.ordinal], infoKParam.size_bytes());
+    }
+
+    CudaRtFrontend::AddHostPointerForArguments<byte>(pArgsPayload, argsPayloadSize);
+
+    CudaRtFrontend::Execute("cudaLaunchCooperativeKernel");
+    free(pArgsPayload);
+    return CudaRtFrontend::GetExitCode();
+}
