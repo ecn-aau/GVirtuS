@@ -7,6 +7,13 @@ export EXTRA_NVCCFLAGS='--cudart=shared'
 export GVIRTUS_LOGLEVEL=10000
 export LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${GVIRTUS_HOME}/lib/frontend:${LD_LIBRARY_PATH}
 
+# --- Recompile GVirtuS to ensure the latest changes are included and evaluate error codes---
+cd ${GVIRTUS_HOME}/build && make -j$(nproc) && make install
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to compile GVirtuS. Please check the logs for details."
+    exit 1
+fi
+
 # --- Navigate to the examples folder ---
 cd "${GVIRTUS_HOME}/examples/simple_matrix" || { echo "Failed to enter ${GVIRTUS_HOME}/examples"; exit 1; }
 
