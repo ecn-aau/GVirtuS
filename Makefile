@@ -70,7 +70,6 @@ run-openpose-test:
 docker-build-2d-human-parsing:
 	docker buildx build \
 		--platform linux/amd64 \
-		--no-cache \
 		-f examples/2d-human-parsing/Dockerfile \
 		-t human-parsing_gvirtus:cuda12.6 \
 		examples/2d-human-parsing	
@@ -80,6 +79,9 @@ run-2d-human-parsing-test:
 		--name human_parsing_test_container \
 		--network host \
 		--shm-size=8G \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
 		-v ./examples/2d-human-parsing/inference_acc_00.py:/opt/2D-Human-Parsing/inference/inference_acc_00.py \
 		-v ./examples/2d-human-parsing/demo_imgs:/opt/2D-Human-Parsing/demo_imgs \
 		-v ./examples/2d-human-parsing/properties.json:/opt/GVirtuS/etc/properties.json \
