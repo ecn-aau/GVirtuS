@@ -255,6 +255,7 @@ extern "C" __host__ void **__cudaRegisterFatBinaryEnd(void *fatCubin) {
 
     CudaRtFrontend::Prepare();
     CudaRtFrontend::Execute("cudaRegisterFatBinaryEnd", input_buffer);
+    delete input_buffer;
     if (CudaRtFrontend::Success()) return (void **)fatCubin;
     return NULL;
 }
