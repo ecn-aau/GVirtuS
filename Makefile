@@ -12,7 +12,6 @@ docker-build-push-prod:
 # Builds a base image.
 docker-build-gvirtus:
 	docker buildx build \
-		--no-cache \
 		--platform linux/amd64 \
 		-f docker/dev/Dockerfile \
 		-t gvirtus:cuda12.6 \
@@ -50,7 +49,6 @@ run-gvirtus-tests:
 docker-build-openpose:
 	docker buildx build \
 		--platform linux/amd64 \
-		--no-cache \
 		-f examples/openpose/Dockerfile \
 		-t openpose_gvirtus:cuda12.6 \
 		examples/openpose
@@ -75,7 +73,6 @@ run-openpose-test:
 docker-build-2d-human-parsing:
 	docker buildx build \
 		--platform linux/amd64 \
-		--no-cache \
 		-f examples/2d-human-parsing/Dockerfile \
 		-t human-parsing_gvirtus:cuda12.6 \
 		examples/2d-human-parsing	
