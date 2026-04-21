@@ -23,7 +23,12 @@ RUN wget -q https://packages.microsoft.com/config/ubuntu/22.04/packages-microsof
     && rm packages-microsoft-prod.deb \
     && apt update \
     && apt install -y --no-install-recommends libmsquic=${MSQUIC_VERSION} \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && find /usr/lib -name 'libmsquic.so.2' | xargs -I{} ln -sf {} /usr/local/lib/libmsquic.so \
+    && wget -q "https://github.com/microsoft/msquic/archive/refs/tags/v${MSQUIC_VERSION}.tar.gz" -O /tmp/msquic-src.tar.gz \
+    && tar -xzf /tmp/msquic-src.tar.gz -C /tmp \
+    && cp /tmp/msquic-${MSQUIC_VERSION}/src/inc/*.h /usr/include/ \
+    && rm -rf /tmp/msquic-src.tar.gz /tmp/msquic-${MSQUIC_VERSION}
 
 ENV GVIRTUS_HOME=/opt/GVirtuS
 ENV DEBIAN_FRONTEND=noninteractive

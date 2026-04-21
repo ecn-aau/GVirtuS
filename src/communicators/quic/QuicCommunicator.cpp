@@ -892,8 +892,8 @@ void QuicCommunicator::Serve() {
     int argc = 2;
     const char * argv[2];
     
-    argv[0] = (char *)"-cert_file:/gvirtus/etc/server.cert";
-    argv[1] = (char *)"-key_file:/gvirtus/etc/server.key";
+    argv[0] = (char *)"-cert_file:" GVIRTUS_HOME "/etc/server.cert";
+    argv[1] = (char *)"-key_file:" GVIRTUS_HOME "/etc/server.key";
 
     printf("Load Server Config\n");
     if (!ServerLoadConfiguration(argc, argv)) {
