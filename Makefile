@@ -60,6 +60,9 @@ run-openpose-test:
 	docker run --rm \
 		--name openpose_test_container \
 		--network host \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
 		-v ./examples/openpose/media:/opt/openpose/examples/media \
 		-v ./examples/openpose:/opt/openpose/examples/gvirtus \
 		-v ./examples/openpose/properties.json:/opt/GVirtuS/etc/properties.json \

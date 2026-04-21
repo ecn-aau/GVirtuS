@@ -98,9 +98,6 @@ class EndpointFactory {
     static int index() { return ind_endpoint; }
 
    private:
-    // thread_local: each thread starts at index 0, so concurrent frontend
-    // thread initializations all read communicator[0]. The backend's
-    // sequential init loop still advances per-call on its single thread.
     static thread_local int ind_endpoint;
 };
 }  // namespace gvirtus::communicators

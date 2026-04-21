@@ -119,10 +119,6 @@ void Frontend::Init(Communicator *c) {
 
     LOG4CPLUS_INFO(logger, "Using properties file: " + config_path);
 
-    // Configure this object directly so that GetFrontend()'s caller receives a
-    // fully-initialised instance.  The previous pattern created a second inner
-    // Frontend object and configured that one instead of |this|, causing the
-    // pointer returned by GetFrontend() to carry uninitialised buffers.
     try {
         auto endpoint = EndpointFactory::get_endpoint(config_path);
 

@@ -71,18 +71,7 @@ int tutorialApiCpp()
         const auto opTimer = op::getTimerInit();
 
         op::Wrapper opWrapper{op::ThreadManagerMode::Asynchronous};
-        // GVirtuS frontend maintains a per-thread TCP connection and its
-        // Prepare() path is not safe under concurrent map writes from new
-        // threads.  Disabling multi-threading keeps all CUDA calls on a
-        // single thread and avoids that race condition.
-        opWrapper.disableMultiThreading();
-
-        // Explicit configure() is required before start().  Without it the
-        // internal WrapperStructPose is left with an empty model-folder which
-        // causes a null-dereference during Caffe network initialisation.
-        op::WrapperStructPose wrapperStructPose;
-        opWrapper.configure(wrapperStructPose);
-
+        if (FLAGS_disable_multi_thread) opWrapper.disableMultiThreading();
         opWrapper.start();
 
         const cv::Mat cvImageToProcess = cv::imread(FLAGS_image_path);
