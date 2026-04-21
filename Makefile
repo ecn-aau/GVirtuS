@@ -1,4 +1,4 @@
-.PHONY: docker-build-push-prod docker-build-gvirtus-dependencies run-gvirtus-backend-dev stop-gvirtus attach-gvirtus-bash run-gvirtus-tests docker-build-gvirtus docker-build-openpose run-openpose-test stop-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test stop-2d-human-parsing-test run-simple-matrix-test
+.PHONY: docker-build-push-prod docker-build-gvirtus run-gvirtus-backend-dev run-gvirtus-tests docker-build-openpose run-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test run-simple-matrix-test
 
 docker-build-push-prod:
 	docker buildx build \
@@ -9,61 +9,43 @@ docker-build-push-prod:
 		-t taslanidis/gvirtus:cuda12.6.3-cudnn-ubuntu22.04 \
 		.
 
-# For development, we build a base image with all dependencies to speed up iterative testing.
-docker-build-gvirtus-dependencies:
+# Builds a base image.
+docker-build-gvirtus:
 	docker buildx build \
 		--platform linux/amd64 \
-		--no-cache \
 		-f docker/dev/Dockerfile \
-		-t gvirtus_dependencies:cuda12.6 \
+		-t gvirtus:cuda12.6 \
 		.
 
-# Runs the development container with all source code mounted, allowing for fast iteration without rebuilding the image.
+# Runs the backend development container.
+# Run docker-build-gvirtus first to build the base image.
 run-gvirtus-backend-dev:
 	docker run \
 		--rm \
 		-it \
 		--network host \
 		--privileged \
-		-v ./cmake:/gvirtus/cmake/ \
-		-v ./etc:/gvirtus/etc/ \
-		-v ./include:/gvirtus/include/ \
-		-v ./plugins:/gvirtus/plugins/ \
-		-v ./src:/gvirtus/src/ \
-		-v ./tools:/gvirtus/tools/ \
-		-v ./tests:/gvirtus/tests/ \
-		-v ./CMakeLists.txt:/gvirtus/CMakeLists.txt \
+		-v ./etc:/opt/GVirtuS/etc/ \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
 		-v ./docker/dev/entrypoint.sh:/entrypoint.sh \
-		-v ./examples:/gvirtus/examples/ \
 		--entrypoint /entrypoint.sh \
-		--name gvirtus \
+		--name gvirtus-backend-dev \
 		--runtime=nvidia \
 		--shm-size=8G \
-		gvirtus_dependencies:cuda12.6
-
-stop-gvirtus:
-	docker stop gvirtus || true
-
-attach-gvirtus-bash:
-		docker exec -it gvirtus bash
+		gvirtus:cuda12.6
 
 run-gvirtus-tests:
 	docker exec \
-		-it gvirtus \
+		-it gvirtus-backend-dev \
 		bash -c \
 		'export LD_LIBRARY_PATH=$$GVIRTUS_HOME/lib/frontend:$$LD_LIBRARY_PATH && \
 			cd /gvirtus/build && \
 			ctest --output-on-failure'
 
-# Builds a base image used for frontend examples.
-docker-build-gvirtus:
-	docker buildx build \
-		--platform linux/amd64 \
-		-f docker/dev/Dockerfile.frontend \
-		-t gvirtus:cuda12.6 \
-		.
-
-# OpenPose example.
+# Build the OpenPose example.
+# Run docker-build-gvirtus first to build the base image.
 docker-build-openpose:
 	docker buildx build \
 		--platform linux/amd64 \
@@ -71,10 +53,14 @@ docker-build-openpose:
 		-t openpose_gvirtus:cuda12.6 \
 		examples/openpose
 
+# Runs the OpenPose example test.
 run-openpose-test: 
 	docker run --rm \
 		--name openpose_test_container \
 		--network host \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
 		-v ./examples/openpose/media:/opt/openpose/examples/media \
 		-v ./examples/openpose:/opt/openpose/examples/gvirtus \
 		-v ./examples/openpose/properties.json:/opt/GVirtuS/etc/properties.json \
@@ -82,23 +68,24 @@ run-openpose-test:
 		openpose_gvirtus:cuda12.6 \
 		bash /entrypoint.sh
 
-stop-openpose-test:
-	docker stop openpose_test_container || true
-
-# 2D Human Parsing example.
+# Builds the 2D Human Parsing example.
+# Run docker-build-gvirtus first to build the base image.
 docker-build-2d-human-parsing:
 	docker buildx build \
 		--platform linux/amd64 \
-		--no-cache \
 		-f examples/2d-human-parsing/Dockerfile \
 		-t human-parsing_gvirtus:cuda12.6 \
 		examples/2d-human-parsing	
 
+# Runs the 2D Human Parsing example test.
 run-2d-human-parsing-test: 
 	docker run --rm \
 		--name human_parsing_test_container \
 		--network host \
 		--shm-size=8G \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
 		-v ./examples/2d-human-parsing/inference_acc_00.py:/opt/2D-Human-Parsing/inference/inference_acc_00.py \
 		-v ./examples/2d-human-parsing/demo_imgs:/opt/2D-Human-Parsing/demo_imgs \
 		-v ./examples/2d-human-parsing/properties.json:/opt/GVirtuS/etc/properties.json \
@@ -106,18 +93,18 @@ run-2d-human-parsing-test:
 		human-parsing_gvirtus:cuda12.6 \
 		bash /entrypoint.sh
 
-stop-2d-human-parsing-test:
-	docker stop human_parsing_test_container || true
-
-# Simple Matrix example.
+# Runs the simple matrix example test.
 run-simple-matrix-test:
 	docker run \
 		--rm \
 		-it \
 		--name simple_matrix_test_container \
 		--network host \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
 		-v ./examples/simple_matrix/properties.json:/opt/GVirtuS/etc/properties.json \
 		-v ./examples/simple_matrix:/opt/GVirtuS/examples/simple_matrix \
-		-v ./examples/simple_matrix/frontend.sh:/opt/GVirtuS/frontend.sh \
+		-v ./examples/simple_matrix/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
 		gvirtus:cuda12.6 \
-		bash /opt/GVirtuS/frontend.sh
+		bash /opt/GVirtuS/entrypoint.sh

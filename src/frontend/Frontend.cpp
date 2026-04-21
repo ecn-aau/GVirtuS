@@ -117,23 +117,13 @@ void Frontend::Init(Communicator *c) {
 
     std::unique_ptr<char> default_endpoint;
 
-    // no frontend found
-    {
-        std::lock_guard<std::mutex> lock(gFrontendMutex);
-        if (mpFrontends->find(tid) == mpFrontends->end()) {
-            Frontend *f = new Frontend();
-            mpFrontends->insert(make_pair(tid, f));
-        }
-    }
-
     LOG4CPLUS_INFO(logger, "Using properties file: " + config_path);
 
     try {
         auto endpoint = EndpointFactory::get_endpoint(config_path);
 
-        mpFrontends->find(tid)->second->_communicator =
-            CommunicatorFactory::get_communicator(endpoint);
-        mpFrontends->find(tid)->second->_communicator->obj_ptr()->Connect();
+        this->_communicator = CommunicatorFactory::get_communicator(endpoint);
+        this->_communicator->obj_ptr()->Connect();
     } catch (const std::exception &e) {
         LOG4CPLUS_FATAL(logger, fs::path(__FILE__).filename()
                                     << ":" << __LINE__ << ":"
@@ -141,11 +131,11 @@ void Frontend::Init(Communicator *c) {
         exit(EXIT_FAILURE);
     }
 
-    mpFrontends->find(tid)->second->mpInputBuffer = std::make_shared<Buffer>();
-    mpFrontends->find(tid)->second->mpOutputBuffer = std::make_shared<Buffer>();
-    mpFrontends->find(tid)->second->mpLaunchBuffer = std::make_shared<Buffer>();
-    mpFrontends->find(tid)->second->mExitCode = -1;
-    mpFrontends->find(tid)->second->mpInitialized = true;
+    this->mpInputBuffer = std::make_shared<Buffer>();
+    this->mpOutputBuffer = std::make_shared<Buffer>();
+    this->mpLaunchBuffer = std::make_shared<Buffer>();
+    this->mExitCode = -1;
+    this->mpInitialized = true;
 }
 
 Frontend::~Frontend() {
@@ -328,7 +318,11 @@ void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
 void Frontend::Prepare() {
     pid_t tid = syscall(SYS_gettid);
     {
-        if (this->mpFrontends->find(tid) != mpFrontends->end())
+        // Hold the mutex while reading mpFrontends to prevent a data race with
+        // GetFrontend() calls from other threads (e.g. OpenPose worker threads)
+        // that may be inserting a new entry for their own tid at the same time.
+        std::lock_guard<std::mutex> lock(gFrontendMutex);
+        if (mpFrontends->find(tid) != mpFrontends->end())
             mpFrontends->find(tid)->second->mpInputBuffer->Reset();
     }
 }

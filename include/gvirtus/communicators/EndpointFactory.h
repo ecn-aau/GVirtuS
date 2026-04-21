@@ -98,6 +98,6 @@ class EndpointFactory {
     static int index() { return ind_endpoint; }
 
    private:
-    static int ind_endpoint;
+    static thread_local int ind_endpoint;
 };
 }  // namespace gvirtus::communicators

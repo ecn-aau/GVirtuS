@@ -1,3 +1,3 @@
 #include "gvirtus/communicators/EndpointFactory.h"
 
-int gvirtus::communicators::EndpointFactory::ind_endpoint = 0;
+thread_local int gvirtus::communicators::EndpointFactory::ind_endpoint = 0;
