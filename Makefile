@@ -1,4 +1,4 @@
-.PHONY: docker-build-push-prod docker-build-gvirtus run-gvirtus-backend-dev stop-gvirtus-backend-dev attach-gvirtus-backend-dev-bash run-gvirtus-tests docker-build-openpose run-openpose-test stop-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test stop-2d-human-parsing-test run-simple-matrix-test
+.PHONY: docker-build-push-prod docker-build-gvirtus run-gvirtus-backend-dev run-gvirtus-tests docker-build-openpose run-openpose-test docker-build-2d-human-parsing run-2d-human-parsing-test run-simple-matrix-test
 
 docker-build-push-prod:
 	docker buildx build \
@@ -17,7 +17,8 @@ docker-build-gvirtus:
 		-t gvirtus:cuda12.6 \
 		.
 
-# Runs the development container with all source code mounted, allowing for fast iteration without rebuilding the image.
+# Runs the backend development container.
+# Run docker-build-gvirtus first to build the base image.
 run-gvirtus-backend-dev:
 	docker run \
 		--rm \
@@ -35,10 +36,6 @@ run-gvirtus-backend-dev:
 		--shm-size=8G \
 		gvirtus:cuda12.6
 
-
-attach-gvirtus-backend-dev-bash:
-		docker exec -it gvirtus-backend-dev bash
-
 run-gvirtus-tests:
 	docker exec \
 		-it gvirtus-backend-dev \
@@ -47,7 +44,8 @@ run-gvirtus-tests:
 			cd /gvirtus/build && \
 			ctest --output-on-failure'
 
-# OpenPose example.
+# Build the OpenPose example.
+# Run docker-build-gvirtus first to build the base image.
 docker-build-openpose:
 	docker buildx build \
 		--platform linux/amd64 \
@@ -55,6 +53,7 @@ docker-build-openpose:
 		-t openpose_gvirtus:cuda12.6 \
 		examples/openpose
 
+# Runs the OpenPose example test.
 run-openpose-test: 
 	docker run --rm \
 		--name openpose_test_container \
@@ -66,7 +65,8 @@ run-openpose-test:
 		openpose_gvirtus:cuda12.6 \
 		bash /entrypoint.sh
 
-# 2D Human Parsing example.
+# Builds the 2D Human Parsing example.
+# Run docker-build-gvirtus first to build the base image.
 docker-build-2d-human-parsing:
 	docker buildx build \
 		--platform linux/amd64 \
@@ -74,6 +74,7 @@ docker-build-2d-human-parsing:
 		-t human-parsing_gvirtus:cuda12.6 \
 		examples/2d-human-parsing	
 
+# Runs the 2D Human Parsing example test.
 run-2d-human-parsing-test: 
 	docker run --rm \
 		--name human_parsing_test_container \
@@ -89,7 +90,7 @@ run-2d-human-parsing-test:
 		human-parsing_gvirtus:cuda12.6 \
 		bash /entrypoint.sh
 
-# Simple Matrix example.
+# Runs the simple matrix example test.
 run-simple-matrix-test:
 	docker run \
 		--rm \
