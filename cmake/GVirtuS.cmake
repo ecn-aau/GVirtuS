@@ -13,11 +13,7 @@ include(ExternalProject)
 
 # Set the external install location
 set(EXTERNAL_INSTALL_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/external)
-find_library(LIBMSQUIC NAMES msquic HINTS /usr/local/lib /usr/lib /usr/lib/x86_64-linux-gnu)
-if(NOT LIBMSQUIC)
-    message(WARNING "libmsquic not found; QUIC communicator will not link correctly")
-    set(LIBMSQUIC "")
-endif()
+set(LIBMSQUIC /usr/local/lib/libmsquic.so)
 
 # Include the log4cplus module (downloads or finds it)
 include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/log4cplus.cmake)

@@ -17,20 +17,15 @@ RUN apt update && apt install -y --no-install-recommends \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-ARG MSQUIC_VERSION=2.5.6
-RUN wget -q https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb \
-    && dpkg -i packages-microsoft-prod.deb \
-    && rm packages-microsoft-prod.deb \
-    && apt update \
-    && apt install -y --no-install-recommends libmsquic=${MSQUIC_VERSION} \
-    && rm -rf /var/lib/apt/lists/* \
-    && find /usr/lib -name 'libmsquic.so.2' | xargs -I{} ln -sf {} /usr/local/lib/libmsquic.so \
-    && wget -q "https://github.com/microsoft/msquic/archive/refs/tags/v${MSQUIC_VERSION}.tar.gz" -O /tmp/msquic-src.tar.gz \
-    && tar -xzf /tmp/msquic-src.tar.gz -C /tmp \
-    && cp /tmp/msquic-${MSQUIC_VERSION}/src/inc/*.h /usr/include/ \
-    && rm -rf /tmp/msquic-src.tar.gz /tmp/msquic-${MSQUIC_VERSION}
 
 ENV GVIRTUS_HOME=/opt/GVirtuS
+    
+COPY ./msquic ${GVIRTUS_HOME}/msquic
+RUN cd ${GVIRTUS_HOME}/msquic &&  \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build && \
+    cmake --install build
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 COPY ./src/ ${GVIRTUS_HOME}/src/
@@ -48,5 +43,5 @@ RUN cmake -B build -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} \
     cd build && \
     make -j$(nproc) && make install
 
-ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:/usr/local/lib:${LD_LIBRARY_PATH}
 WORKDIR ${GVIRTUS_HOME}
