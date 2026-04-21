@@ -175,6 +175,7 @@ Frontend::~Frontend() {
             if (it->first != tid) {
                 delete it->second;
             }
+            it->second->_communicator->obj_ptr()->Close();
             it = mpFrontends->erase(it);
         }
 
