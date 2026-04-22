@@ -73,6 +73,8 @@ uint32_t DecodeHexBuffer(const char* HexBuffer, uint32_t OutBufferLen, uint8_t* 
 // Public methods
 // =============================================================================
 
+namespace gvirtus::communicators {
+
 QuicCommunicator::QuicCommunicator(const QuicCommunicator& other) {
     mHostname = other.mHostname;
     mPort = other.mPort;
@@ -104,6 +106,8 @@ QuicCommunicator::~QuicCommunicator() {
         MsQuic->StreamClose(DefaultStream);
     if (Connection != NULL)
         MsQuic->ConnectionClose(Connection);
+
+    // TODO: This should probably do more stuff
 }
 
 
@@ -132,6 +136,7 @@ void QuicCommunicator::Serve() {
     //
     // Create/allocate a new listener object.
     //
+    // TODO: THIS DOES NOT WORK. REVIEW ServerListenerCallback (maybe static with main QuicCommunicator keeping track of connections)
     if (QUIC_FAILED(Status = MsQuic->ListenerOpen(Registration, ServerListenerCallback, this, &Listener))) {
         printf("ListenerOpen failed, 0x%x!\n", Status);
         throw std::runtime_error("ListenerOpen failed");
@@ -265,8 +270,34 @@ void QuicCommunicator::InitializeQuic(void) {
     Listener = NULL;
 }
 
+Pipes gvirtus::communicators::QuicCommunicator::InitializePipes() {
+    int pipes[2];
+    if (pipe(pipes) == -1) {
+        printf("Failed to create pipe\n");
+        throw std::runtime_erro("Failed to create pipe");
+    }
+    Pipes fdPipes {pipes[0], pipes[1]};
+
+    int pipe_size = 4096 * 4096 * 4; // 1MB buffer or adjust as needed
+    fcntl(fdPipes.in, F_SETPIPE_SZ, pipe_size);
+    fcntl(fdPipes.out, F_SETPIPE_SZ, pipe_size);
+
+    return fdPipes;
+}
+
 bool QuicCommunicator::ServerLoadConfiguration(int argc, const char* argv[])
 {
+
+
+    // TODO: DELETE WHEN IT IS CONFIGURABLE
+    Settings.IdleTimeoutMs = 0;
+    Settings.IsSet.IdleTimeoutMs = TRUE;
+
+    Settings.SendBufferingEnabled = FALSE;
+    Settings.IsSet.SendBufferingEnabled = TRUE;
+
+    Settings.MaximumMtu = 1200;
+    Settings.IsSet.MaximumMtu = TRUE;
 
     QUIC_CREDENTIAL_CONFIG_HELPER Config;
     memset(&Config, 0, sizeof(Config));
@@ -407,30 +438,16 @@ QUIC_STATUS QuicCommunicator::ServerConnectionCallback(HQUIC Connection, void* C
         //
         printf("[conn][%p] All done\n", Connection);
         MsQuic->ConnectionClose(Connection);
+        // TODO: Should free all streams.
         break;
         
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
-        //
-        // The peer has started/created a new stream. The app MUST set the
-        // callback handler before returning.
-        //
+        if (DefaultStream == nullptr) {
+            DefaultStream = Stream;
+        }
         {
-            QUIC_UINT62 tmpsid;
-            MsQuic->GetParam(Event->PEER_STREAM_STARTED.Stream, QUIC_PARAM_STREAM_ID, &sidSize, &tmpsid);
-            DEBUG_PRINTF("[strm][%p] Peer started witd id %lu\n", Event->PEER_STREAM_STARTED.Stream, tmpsid);
-
-            //ToDo Delete QuicCommunicator
-            QuicCommunicator newQuicCommunicator{*this};
-            newQuicCommunicator.InitializePipes();
-
-            newQuicCommunicator.DefaultStream = Event->PEER_STREAM_STARTED.Stream;
-            NewStreamQuicCommunicator->Stream = Event->PEER_STREAM_STARTED.Stream;
-            NewStreamQuicCommunicator->Connection = Connection;
-            NewStreamQuicCommunicator->sid = tmpsid;
-            //set     HQUIC Registration;  HQUIC Configuration; HQUIC Listener;
-            MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream, (void *) ServerStreamCallback, NewStreamQuicCommunicator);
-
-            break;
+            std::scoped_lock(multiStreamMutex);
+            multiStreams[Stream] = InitializePipes();
         }
 
     default:
@@ -447,74 +464,168 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
     QUIC_BUFFER* qb=NULL;
     DEBUG_PRINTF("[sid %lu] called", sid);
     int wp = -1;
-    if (QuicCommunicator::pipemap.find(sid) != QuicCommunicator::pipemap.end()) {
-        wp = QuicCommunicator::pipemap[sid];
-        DEBUG_PRINTF("[sid %lu] Get pipe %d %p %d\n",sid, wp,Stream,Event->Type);
-    }
-    else {
-        DEBUG_PRINTF("[sid %lu] Pipe not found pipe %d %p %d\n",sid, wp,Stream,Event->Type);
-        return QUIC_STATUS_SUCCESS;
-    }
+    
+
     switch (Event->Type) {
-    case QUIC_STREAM_EVENT_SEND_COMPLETE:
-        //
-        // A previous StreamSend call has completed, and the context is being
-        // returned back to the app.
-        //
-       qb = (QUIC_BUFFER*)Event->SEND_COMPLETE.ClientContext;
+        case QUIC_STREAM_EVENT_SEND_COMPLETE:
+            qb = (QUIC_BUFFER*)Event->SEND_COMPLETE.ClientContext;
+            DEBUG_PRINTF("[strm][%p] Sent is complete.\n", Stream);
+            free(Event->SEND_COMPLETE.ClientContext);
+            return QUIC_STATUS_SUCCESS;
 
-        
-        DEBUG_PRINTF("[strm][%p] Data sent %d\n", Stream, qb->Length);
-        free(Event->SEND_COMPLETE.ClientContext);
-        break;
-    case QUIC_STREAM_EVENT_RECEIVE:
-        //
-        // Data was received from the peer on the stream.
-        //
-        // Write received data to the pipe
+        case QUIC_STREAM_EVENT_RECEIVE:
 
-
-        for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i) {
-            const QUIC_BUFFER* b = &Event->RECEIVE.Buffers[i];
-            DEBUG_PRINTF("[sid %lu] [strm %p] [pipe %d] Data received %u, flags %d\n", sid, Stream, wp, b->Length, Event->RECEIVE.Flags);
-            /*if (write_all_nonblocking(wp, b->Buffer, b->Length, 10000) == -1) {
-                printf("Failed to write to pipe\n");
-                throw "Failed to write to pipe";
-            }*/
-            if (write(wp, b->Buffer, b->Length) == -1) {
-                printf("Failed to write to pipe\n");
-                throw "Failed to write to pipe";
+            if (multiStreams.find(Stream) == multiStreams.end()) {
+                DEBUG_PRINTF("[sid %lu] Pipe not found for stream %p\n", sid, Stream);
+                return QUIC_STATUS_NOT_FOUND;
             }
-            DEBUG_PRINTF("[sid %lu] [strm %p] [pipe %d] Data written %u, flags %d\n", sid, Stream, wp, b->Length, Event->RECEIVE.Flags);
-        }
-        break;
-    case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
-        //
-        // The peer gracefully shut down its send direction of the stream.
-        //
-        DEBUG_PRINTF("[strm][%p] Peer shut down\n", Stream);
-        //ServerSend(Stream);
-        break;
-    case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
-        //
-        // The peer aborted its send direction of the stream.
-        //
-        DEBUG_PRINTF("[strm][%p] Peer aborted\n", Stream);
-        MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
-        break;
-    case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
-        //
-        // Both directions of the stream have been shut down and MsQuic is done
-        // with the stream. It can now be safely cleaned up.
-        //
-        DEBUG_PRINTF("[strm][%p] All done\n", Stream);
-        QuicCommunicator::pipemap.erase(sid);
-        MsQuic->StreamClose(Stream);
-        break;
-    default:
-        break;
+            else {
+                wp = multiStreams[Stream].out;
+                DEBUG_PRINTF("[sid %lu] Get pipe %d for stream %p\n", sid, wp, Stream);
+            }
+
+            for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i) {
+                
+                const QUIC_BUFFER* b = &Event->RECEIVE.Buffers[i];
+                DEBUG_PRINTF("[sid %lu] [strm %p] [pipe %d] Data received %u, flags %d\n", sid, Stream, wp, b->Length, Event->RECEIVE.Flags);
+                
+                // TODO: May be substituted by non blocking write
+                if (write(wp, b->Buffer, b->Length) == -1) {
+                    printf("Failed to write to pipe\n");
+                    throw std::runtime_error("Failed to write to pipe");
+                }
+                DEBUG_PRINTF("[sid %lu] [strm %p] [pipe %d] Data written %u, flags %d\n", sid, Stream, wp, b->Length, Event->RECEIVE.Flags);
+            }
+            return QUIC_STATUS_SUCCESS;
+
+        case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
+            DEBUG_PRINTF("[strm][%p] Peer shut down\n", Stream);
+            return QUIC_STATUS_SUCCESS;
+
+        case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
+            DEBUG_PRINTF("[strm][%p] Peer aborted\n", Stream);
+            MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_ABORT, 0);
+            return QUIC_STATUS_SUCCESS;
+
+        case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
+            DEBUG_PRINTF("[strm][%p] All done\n", Stream);
+            MsQuic->StreamClose(Stream);
+            
+            if (multiStreams.find(Stream) != multiStreams.end()) {
+                std::scoped_lock(multiStreamMutex);
+                close(multiStreams[Stream].in);
+                close(multiStreams[Stream].out);
+                multiStreams.erase(Stream);
+
+            }
+            return QUIC_STATUS_SUCCESS;
+
+        default:
+            break;
     }
-    return QUIC_STATUS_SUCCESS;
+    return QUIC_STATUS_NOT_FOUND;
+}
+
+// =============================================================================
+// Read / Write Functions
+// ============================================================================
+
+size_t QuicCommunicator::Read(char *buffer, size_t size) {
+
+    // TODO: REVIEW THIS FUNCTION
+    ssize_t ret_value=0;
+    ssize_t size_left=size;
+
+    while(size_left>0) {
+
+        DEBUG_PRINTF("[sid %lu] QuicCommunicator::Read() Block on read() %ld %lu %lu\n", sid, ret_value,size,size_left);
+
+        ssize_t r = read(multiStreams[DefaultStream].in, buffer+ret_value, size_left);
+
+        if (r < 0) {
+            DEBUG_PRINTF("errno %d\n",errno);
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                //usleep(10);
+                continue;
+            }
+            continue;
+        }
+        
+        if (r < 0 || r==0){
+            ret_value = 0;
+            continue;
+        }
+        else {
+            ret_value += r;
+            size_left=size_left-r;
+            if (size_left == 0)
+                break;
+        }
+        DEBUG_PRINTF("[sid %lu] Read return value: %ld %ld %lu %lu\n",sid ,r,ret_value,size,size_left);
+    }
+
+
+    return ret_value;
+}
+
+
+size_t QuicCommunicator::Write(const char *buffer, size_t size) {
+
+    DEBUG_PRINTF("[sid %lu] %s called with size %lu", sid, __PRETTY_FUNCTION__, size);
+
+    QUIC_STATUS Status;
+
+    //
+    // Allocates and builds the buffer to send over the stream.
+    //
+    size_t MAX_BUF_SIZE = 4096*4096*4;
+
+    size_t size_left = size;
+    size_t send_size = 0;
+    size_t send_size_cum = 0;
+
+    DEBUG_PRINTF("[strm][%p] Sending data total... %ld", Stream, size);
+
+    while (size_left>0)
+    {
+        uint8_t* SendBufferRaw;
+        QUIC_BUFFER* SendBuffer;
+        
+        if (size_left > MAX_BUF_SIZE)
+            send_size = MAX_BUF_SIZE;
+        else
+            send_size = size_left;
+        
+        SendBufferRaw = (uint8_t*)malloc(sizeof(QUIC_BUFFER) + send_size);
+        if (SendBufferRaw == NULL) {
+            printf("SendBuffer allocation failed!\n");
+            Status = QUIC_STATUS_OUT_OF_MEMORY;
+            goto Error;
+        }
+        memcpy(SendBufferRaw+sizeof(QUIC_BUFFER), buffer+send_size_cum, send_size);
+        SendBuffer = (QUIC_BUFFER*)SendBufferRaw;
+        SendBuffer->Buffer = SendBufferRaw + sizeof(QUIC_BUFFER);
+        SendBuffer->Length = send_size;
+
+        DEBUG_PRINTF("[strm %p] Sending data... %ld %ld\n", Stream, send_size, sizeof(QUIC_BUFFER));
+        send_size_cum += send_size;
+        size_left -= send_size;
+
+
+        //s
+        // Sends the buffer over the stream. Note the FIN flag is passed along with
+        // the buffer. This indicates this is the last buffer on the stream and the
+        // the stream is shut down (in the send direction) immediately after.
+        //
+        if (QUIC_FAILED(Status = MsQuic->StreamSend(Stream, SendBuffer, 1, QUIC_SEND_FLAG_NONE, SendBuffer))) {
+            printf("StreamSend failed, 0x%x!\n", Status);
+            free(SendBufferRaw);
+        }
+        printf("[strm %p] Data sent... %ld %ld\n", Stream, send_size, sizeof(QUIC_BUFFER));
+    }
+    
+
+    return size;
 }
 
 // =============================================================================
@@ -530,3 +641,4 @@ extern "C" std::shared_ptr <QuicCommunicator> create_communicator(
             std::to_string(std::dynamic_pointer_cast<gvirtus::communicators::Endpoint_Quic>(end)->port());
     return std::make_shared<QuicCommunicator>(arg);
 }
+};

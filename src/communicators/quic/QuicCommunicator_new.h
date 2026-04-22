@@ -26,6 +26,10 @@ typedef struct QUIC_CREDENTIAL_CONFIG_HELPER {
 
 const QUIC_BUFFER Alpn = { sizeof("gvirtus") - 1, (uint8_t*)"gvirtus" };
 
+struct Pipes {
+    int in;
+    int out;
+};
 
 class QuicCommunicator : public gvirtus::communicators::Communicator {
 public:
@@ -47,13 +51,18 @@ private:
     bool ServerLoadConfiguration(int argc, const char* argv[] );
     bool ClientLoadConfiguration(bool unsecure);
 
-
+    // Callbacks TODO: IMPLEMENT WRAPPER
     QUIC_STATUS ServerListenerCallback(HQUIC Listener, void* Context, QUIC_LISTENER_EVENT* Event);
+    static QUIC_STATUS ServerListenerCallbackWrapper(HQUIC Listener, void* Context, QUIC_LISTENER_EVENT* Event);
     QUIC_STATUS ServerConnectionCallback(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event);
+    static QUIC_STATUS ServerConnectionCallbackWrapper(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event);
     QUIC_STATUS ServerStreamCallback(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event);
+    static QUIC_STATUS ServerStreamCallbackWrapper(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event);
 
     QUIC_STATUS ClientConnectionCallback(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event);
+    static QUIC_STATUS ClientConnectionCallback(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event);
     QUIC_STATUS ClientStreamCallback(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event);
+    static QUIC_STATUS ClientStreamCallbackWrapper(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event);
 
     // Listener objects
     HQUIC Listener;
@@ -71,7 +80,9 @@ private:
     HQUIC DefaultStream;
     QUIC_SETTINGS Settings = {0};
 
-    std::map<void*, HQUIC> MultiStreams;
+    // map of streams and their corresponding pipes. The key is the stream id, which is a 62 bit unsigned integer.
+    std::map<HQUIC, Pipes> multiStreams;
+    std::mutex multiStreamMutex;
 
     std::string mHostname;
     uint16_t mPort;
