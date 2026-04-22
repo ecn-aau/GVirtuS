@@ -32,7 +32,7 @@
  *
  *
  */
-#define DEBUG
+// #define DEBUG
 
 #include "QuicCommunicator.h"
 
