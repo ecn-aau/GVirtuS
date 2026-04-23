@@ -45,32 +45,39 @@ public:
     void Sync();
     void Close();
 
-private:
-    void InitializeQuic();
-    Pipes InitializePipes();
-    bool ServerLoadConfiguration(int argc, const char* argv[] );
-    bool ClientLoadConfiguration(bool unsecure);
-
-    // Callbacks TODO: IMPLEMENT WRAPPER
+    // Callbacks - Must be public due to Wrapper calling object callbacks
     QUIC_STATUS ServerListenerCallback(HQUIC Listener, void* Context, QUIC_LISTENER_EVENT* Event);
     static QUIC_STATUS ServerListenerCallbackWrapper(HQUIC Listener, void* Context, QUIC_LISTENER_EVENT* Event);
     QUIC_STATUS ServerConnectionCallback(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event);
     static QUIC_STATUS ServerConnectionCallbackWrapper(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event);
     QUIC_STATUS ServerStreamCallback(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event);
     static QUIC_STATUS ServerStreamCallbackWrapper(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event);
-
+    
     QUIC_STATUS ClientConnectionCallback(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event);
-    static QUIC_STATUS ClientConnectionCallback(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event);
+    static QUIC_STATUS ClientConnectionCallbackWrapper(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event);
     QUIC_STATUS ClientStreamCallback(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event);
     static QUIC_STATUS ClientStreamCallbackWrapper(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event);
+protected:
+
+
+private:
+    void InitializeQuic();
+    Pipes InitializePipes();
+    bool ServerLoadConfiguration(int argc, const char* argv[] );
+    bool ClientLoadConfiguration(bool unsecure);
+
+
+
+    // !! Mutables are needed because Accept is a const function. (Should find a better solution)
+    // Maybe do most changes in other functions?
 
     // Listener objects
     HQUIC Listener;
-    HQUIC receivedConnection;
-    std::condition_variable listernerCv;
-    std::mutex listenerMutex;
-    bool connectionEventOcurred = false;
-    bool listenerStarted = false;
+    mutable HQUIC receivedConnection;
+    mutable std::condition_variable listernerCv;
+    mutable std::mutex listenerMutex;
+    mutable bool connectionEventOcurred = false;
+    mutable bool listenerStarted = false;
 
     // Connection objects
     HQUIC Connection = nullptr;

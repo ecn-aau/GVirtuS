@@ -1,4 +1,6 @@
 #include <stdexcept>
+#include <fcntl.h>
+#include <gvirtus/communicators/Endpoint_Quic.h>
 #include "QuicCommunicator_new.h"
 
 // =============================================================================
@@ -136,8 +138,7 @@ void QuicCommunicator::Serve() {
     //
     // Create/allocate a new listener object.
     //
-    // TODO: THIS DOES NOT WORK. REVIEW ServerListenerCallback (maybe static with main QuicCommunicator keeping track of connections)
-    if (QUIC_FAILED(Status = MsQuic->ListenerOpen(Registration, ServerListenerCallback, this, &Listener))) {
+    if (QUIC_FAILED(Status = MsQuic->ListenerOpen(Registration, ServerListenerCallbackWrapper, this, &Listener))) {
         printf("ListenerOpen failed, 0x%x!\n", Status);
         throw std::runtime_error("ListenerOpen failed");
     }
@@ -181,7 +182,7 @@ const gvirtus::communicators::Communicator *const QuicCommunicator::Accept() con
     QuicCommunicator* newQuicCommunicator = new QuicCommunicator(*this);
     newQuicCommunicator->Connection = receivedConnection;
     newQuicCommunicator->InitializeQuic();
-    newQuicCommunicator->MsQuic->SetCallbackHandler(newQuicCommunicator->Connection, (void*)(newQuicCommunicator->ServerConnectionCallback), NULL);
+    newQuicCommunicator->MsQuic->SetCallbackHandler(newQuicCommunicator->Connection, (void*) ServerConnectionCallbackWrapper, NULL);
     newQuicCommunicator->MsQuic->SetParam(newQuicCommunicator->Connection, QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT, sizeof(int), &stream_count);
     newQuicCommunicator->MsQuic->SetParam(newQuicCommunicator->Connection, QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT, sizeof(int), &stream_count);
 
@@ -209,17 +210,17 @@ void QuicCommunicator::Connect() {
 
     InitializeQuic();
 
-
+    QUIC_STATUS Status;
     // TODO REDO CLIENT LOAD CONFIGURATION
-    if (!ClientLoadConfiguration(GetFlag(argc, argv, "unsecure"))) {
+    if (!ClientLoadConfiguration(true)) {
         return;
     }
 
-    if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(Registration, ClientConnectionCallback, this, &Connection))) {
+    if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(Registration, ClientConnectionCallbackWrapper, this, &Connection))) {
         printf("ConnectionOpen failed, 0x%x!\n", Status);
         throw std::runtime_error("ConnectionOpen failed");
     }
-
+    int stream_count = 65535;
     MsQuic->SetParam(Connection, QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT, sizeof(stream_count), &stream_count);
     MsQuic->SetParam(Connection, QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT, sizeof(stream_count), &stream_count);
 
@@ -231,15 +232,15 @@ void QuicCommunicator::Connect() {
     }
     
     // Open Default Stream
-    if (QUIC_FAILED(Status = MsQuic->StreamOpen(Connection, QUIC_STREAM_OPEN_FLAG_NONE, ClientStreamCallback, nullptr, &DefaultStream))) {
+    if (QUIC_FAILED(Status = MsQuic->StreamOpen(Connection, QUIC_STREAM_OPEN_FLAG_NONE, ClientStreamCallbackWrapper, nullptr, &DefaultStream))) {
         printf("StreamOpen failed, 0x%x!\n", Status);
         throw std::runtime_error("StreamOpen failed");
     }
 
     // Start Default Stream
-    if (QUIC_FAILED(Status = MsQuic->StreamStart(Stream, QUIC_STREAM_START_FLAG_NONE))) {
+    if (QUIC_FAILED(Status = MsQuic->StreamStart(DefaultStream, QUIC_STREAM_START_FLAG_NONE))) {
         printf("StreamStart failed, 0x%x!\n", Status);
-        MsQuic->StreamClose(Stream);
+        MsQuic->StreamClose(DefaultStream);
         throw "StreamStart failed";
     }
 
@@ -274,7 +275,7 @@ Pipes gvirtus::communicators::QuicCommunicator::InitializePipes() {
     int pipes[2];
     if (pipe(pipes) == -1) {
         printf("Failed to create pipe\n");
-        throw std::runtime_erro("Failed to create pipe");
+        throw std::runtime_error("Failed to create pipe");
     }
     Pipes fdPipes {pipes[0], pipes[1]};
 
@@ -366,7 +367,7 @@ bool QuicCommunicator::ServerLoadConfiguration(int argc, const char* argv[])
     return TRUE;
 }
 
-bool QuicCommunicator::ClientLoadConfiguration(int argc, const char* argv[]) {
+bool QuicCommunicator::ClientLoadConfiguration(bool secure) {
     // TODO: Add Client Load Configuration
     return true;
 }
@@ -375,6 +376,10 @@ bool QuicCommunicator::ClientLoadConfiguration(int argc, const char* argv[]) {
 // Callbacks
 // =============================================================================
 
+QUIC_STATUS ServerListenerCallbackWrapper(HQUIC Listener, void* Context, QUIC_LISTENER_EVENT* Event) {
+    auto quicCommunicator = static_cast<QuicCommunicator*>(Context);
+    return quicCommunicator->ServerListenerCallback(Listener, Context, Event);
+}
 
 QUIC_STATUS QuicCommunicator::ServerListenerCallback(HQUIC Listener, void* Context, QUIC_LISTENER_EVENT* Event)
 {
@@ -401,6 +406,12 @@ QUIC_STATUS QuicCommunicator::ServerListenerCallback(HQUIC Listener, void* Conte
         }
     
     return Status;
+}
+
+
+QUIC_STATUS ServerConnectionCallbackWrapper(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event) {
+    auto quicCommunicator = static_cast<QuicCommunicator*>(Context);
+    return quicCommunicator->ServerConnectionCallback(Connection, Context, Event);
 }
 
 QUIC_STATUS QuicCommunicator::ServerConnectionCallback(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event)
@@ -457,6 +468,10 @@ QUIC_STATUS QuicCommunicator::ServerConnectionCallback(HQUIC Connection, void* C
     return QUIC_STATUS_SUCCESS;
 }
 
+QUIC_STATUS ServerStreamCallbackWrapper(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event) {
+    auto quicCommunicator = static_cast<QuicCommunicator*>(Context);
+    return quicCommunicator->ServerStreamCallback(Stream, Context, Event);
+}
 
 QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event)
 {
@@ -524,6 +539,113 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
             break;
     }
     return QUIC_STATUS_NOT_FOUND;
+}
+
+QUIC_STATUS ClientConnectionCallbackWrapper(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event) {
+    auto quicCommunicator = static_cast<QuicCommunicator*>(Context);
+    return quicCommunicator->ClientConnectionCallback(Connection, Context, Event);
+}
+
+QUIC_STATUS QuicCommunicator::ClientConnectionCallback(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event) {
+
+    switch (Event->Type) {
+        case QUIC_CONNECTION_EVENT_CONNECTED:
+            DEBUG_PRINTF("[conn][%p] Connected\n", Connection);
+            Connection=Connection;
+            break;
+
+        case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
+
+            if (Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status == QUIC_STATUS_CONNECTION_IDLE) {
+                printf("[conn][%p] Successfully shut down on idle.\n", Connection);
+            } else {
+                printf("[conn][%p] Shut down by transport, 0x%x\n", Connection, Event->SHUTDOWN_INITIATED_BY_TRANSPORT.Status);
+            }
+            break;
+
+        case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_PEER:
+            printf("[conn][%p] Shut down by peer, 0x%llu\n", Connection, (unsigned long long)Event->SHUTDOWN_INITIATED_BY_PEER.ErrorCode);
+            break;
+
+        case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
+            printf("[conn][%p] All done\n", Connection);
+            if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
+                MsQuic->ConnectionClose(Connection);
+            }
+            break;
+
+        case QUIC_CONNECTION_EVENT_RESUMPTION_TICKET_RECEIVED:
+            break;
+
+        default:
+            break;
+        }
+    return QUIC_STATUS_SUCCESS;
+}
+
+QUIC_STATUS QuicCommunicator::ClientStreamCallbackWrapper(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event) {
+    auto quicCommunicator = static_cast<QuicCommunicator*>(Context);
+    return quicCommunicator->ClientStreamCallback(Stream, Context, Event);
+}
+    
+
+QUIC_STATUS QuicCommunicator::ClientStreamCallback(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event) {
+    int wp = -1;
+
+    QUIC_BUFFER* qb=NULL;
+
+    switch (Event->Type) {
+        case QUIC_STREAM_EVENT_SEND_COMPLETE:
+            qb = (QUIC_BUFFER*)Event->SEND_COMPLETE.ClientContext;
+
+            DEBUG_PRINTF("[strm][%p] Data sent %d\n", Stream, qb->Length) ;
+            free(Event->SEND_COMPLETE.ClientContext);
+            break;
+
+        case QUIC_STREAM_EVENT_RECEIVE:
+            if (multiStreams.find(Stream) == multiStreams.end()) {
+                DEBUG_PRINTF("[sid %lu] Pipe not found for stream %p\n", sid, Stream);
+                return QUIC_STATUS_NOT_FOUND;
+            }
+            else {
+                wp = multiStreams[Stream].out;
+                DEBUG_PRINTF("[sid %lu] Get pipe %d for stream %p\n", sid, wp, Stream);
+            }
+
+            for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i) {
+                
+                const QUIC_BUFFER* b = &Event->RECEIVE.Buffers[i];
+                DEBUG_PRINTF("[sid %lu] [strm %p] [pipe %d] Data received %u, flags %d\n", sid, Stream, wp, b->Length, Event->RECEIVE.Flags);
+                
+                // TODO: May be substituted by non blocking write
+                if (write(wp, b->Buffer, b->Length) == -1) {
+                    printf("Failed to write to pipe\n");
+                    throw std::runtime_error("Failed to write to pipe");
+                }
+                DEBUG_PRINTF("[sid %lu] [strm %p] [pipe %d] Data written %u, flags %d\n", sid, Stream, wp, b->Length, Event->RECEIVE.Flags);
+            }
+            return QUIC_STATUS_SUCCESS;
+
+        case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
+            DEBUG_PRINTF("[strm][%p] Peer aborted\n", Stream);
+            break;
+
+        case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
+            DEBUG_PRINTF("[strm][%p] Peer shut down\n", Stream);
+            break;
+
+        case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
+            DEBUG_PRINTF("[strm][%p] All done\n", Stream);
+            if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
+                MsQuic->StreamClose(Stream);
+            }
+            break;
+
+        default:
+            break;
+    }
+
+    return QUIC_STATUS_SUCCESS;
 }
 
 // =============================================================================
@@ -600,7 +722,6 @@ size_t QuicCommunicator::Write(const char *buffer, size_t size) {
         if (SendBufferRaw == NULL) {
             printf("SendBuffer allocation failed!\n");
             Status = QUIC_STATUS_OUT_OF_MEMORY;
-            goto Error;
         }
         memcpy(SendBufferRaw+sizeof(QUIC_BUFFER), buffer+send_size_cum, send_size);
         SendBuffer = (QUIC_BUFFER*)SendBufferRaw;
@@ -617,11 +738,11 @@ size_t QuicCommunicator::Write(const char *buffer, size_t size) {
         // the buffer. This indicates this is the last buffer on the stream and the
         // the stream is shut down (in the send direction) immediately after.
         //
-        if (QUIC_FAILED(Status = MsQuic->StreamSend(Stream, SendBuffer, 1, QUIC_SEND_FLAG_NONE, SendBuffer))) {
+        if (QUIC_FAILED(Status = MsQuic->StreamSend(DefaultStream, SendBuffer, 1, QUIC_SEND_FLAG_NONE, SendBuffer))) {
             printf("StreamSend failed, 0x%x!\n", Status);
             free(SendBufferRaw);
         }
-        printf("[strm %p] Data sent... %ld %ld\n", Stream, send_size, sizeof(QUIC_BUFFER));
+        printf("[strm %p] Data sent... %ld %ld\n", DefaultStream, send_size, sizeof(QUIC_BUFFER));
     }
     
 
