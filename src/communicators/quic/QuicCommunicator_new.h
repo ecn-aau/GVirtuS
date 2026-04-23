@@ -47,7 +47,7 @@ public:
 
 private:
     void InitializeQuic();
-    void InitializePipes();
+    Pipes InitializePipes();
     bool ServerLoadConfiguration(int argc, const char* argv[] );
     bool ClientLoadConfiguration(bool unsecure);
 

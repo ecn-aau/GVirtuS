@@ -443,11 +443,11 @@ QUIC_STATUS QuicCommunicator::ServerConnectionCallback(HQUIC Connection, void* C
         
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
         if (DefaultStream == nullptr) {
-            DefaultStream = Stream;
+            DefaultStream = Event->PEER_STREAM_STARTED.Stream;
         }
         {
             std::scoped_lock(multiStreamMutex);
-            multiStreams[Stream] = InitializePipes();
+            multiStreams[Event->PEER_STREAM_STARTED.Stream] = InitializePipes();
         }
 
     default:
