@@ -126,3 +126,6 @@ gvirtus/backend/gvirtus-backend
 gvirtus/uWebSockets-prefix/
 
 examples/openpose/models
+
+# Apple file system
+.DS_Store
