@@ -264,8 +264,8 @@ bool QuicCommunicator::ClientLoadConfiguration(BOOLEAN Unsecure)
  
     // 0-RTT: allow the client to send data before the handshake completes
     // on resumed connections (saves one round-trip on reconnect).
-    Settings.ResumeEarlyDataEnabled        = TRUE;
-    Settings.IsSet.ResumeEarlyDataEnabled  = TRUE;
+    //Settings.ResumeEarlyDataEnabled        = TRUE;
+    //Settings.IsSet.ResumeEarlyDataEnabled  = TRUE;
  
     QUIC_CREDENTIAL_CONFIG CredConfig;
     memset(&CredConfig, 0, sizeof(CredConfig));
