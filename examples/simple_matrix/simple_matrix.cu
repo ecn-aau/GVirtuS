@@ -22,7 +22,7 @@ static long elapsed_us(hrc::time_point a, hrc::time_point b) {
 int main(int argc, char *argv[]) {
     const char *communicator = (argc > 1) ? argv[1] : "unknown";
     int         iterations   = (argc > 2) ? std::atoi(argv[2]) : 100;
-    int         N            = (argc > 3) ? std::atoi(argv[3]) : 100;
+    int         N            = (argc > 3) ? std::atoi(argv[3]) : 1000;
     const char *outfile      = (argc > 4) ? argv[4] : "profiling_results.csv";
 
     if (iterations <= 0 || N <= 0) {
