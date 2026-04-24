@@ -243,11 +243,11 @@ bool QuicCommunicator::ClientLoadConfiguration(
     Settings.IsSet.MaxAckDelayMs = TRUE;
 
     // Large receive window to avoid flow control stalls during CUDA memcpy
-    Settings.StreamRecvWindowDefault = 64 * 1024 * 1024; // 64MB
+    Settings.StreamRecvWindowDefault = 16 * 1024 * 1024; // 16MB
     Settings.IsSet.StreamRecvWindowDefault = TRUE;
 
     // Large connection-level flow control window
-    Settings.ConnFlowControlWindow = 64 * 1024 * 1024; // 64MB
+    Settings.ConnFlowControlWindow = 32 * 1024 * 1024; // 32MB
     Settings.IsSet.ConnFlowControlWindow = TRUE;
 
     // Enable datagrams for async/fire-and-forget CUDA operations
@@ -330,11 +330,11 @@ QuicCommunicator::ServerLoadConfiguration(
     Settings.IsSet.MaxAckDelayMs = TRUE;
 
     // Large receive window to avoid flow control stalls during CUDA memcpy
-    Settings.StreamRecvWindowDefault = 64 * 1024 * 1024; // 64MB
+    Settings.StreamRecvWindowDefault = 16 * 1024 * 1024; // 16MB
     Settings.IsSet.StreamRecvWindowDefault = TRUE;
 
     // Large connection-level flow control window
-    Settings.ConnFlowControlWindow = 64 * 1024 * 1024; // 64MB
+    Settings.ConnFlowControlWindow = 32 * 1024 * 1024; // 32MB
     Settings.IsSet.ConnFlowControlWindow = TRUE;
 
     // Enable datagrams for async CUDA operations
