@@ -224,23 +224,56 @@ void QuicCommunicator::InitializePipes()
 
 bool QuicCommunicator::ClientLoadConfiguration(BOOLEAN Unsecure)
 {
-    DEBUG_PRINTF("called");
-
     QUIC_SETTINGS Settings = {0};
-    Settings.IdleTimeoutMs         = 0;
-    Settings.IsSet.IdleTimeoutMs   = TRUE;
-    Settings.SendBufferingEnabled          = FALSE;
-    Settings.IsSet.SendBufferingEnabled    = TRUE;
-    Settings.MaximumMtu            = 1200;
-    Settings.IsSet.MaximumMtu      = TRUE;
-
+ 
+    // Never drop the connection due to inactivity.
+    Settings.IdleTimeoutMs        = 0;
+    Settings.IsSet.IdleTimeoutMs  = TRUE;
+ 
+    // Let MsQuic buffer sends internally so it can coalesce UDP datagrams.
+    // Disabling this (FALSE) caused one StreamSend → one UDP packet, which
+    // is terrible for throughput.  Let MsQuic batch them.
+    Settings.SendBufferingEnabled        = TRUE;
+    Settings.IsSet.SendBufferingEnabled  = TRUE;
+ 
+    // Largest UDP payload MsQuic will attempt.  1452 fits inside a standard
+    // 1500-byte Ethernet MTU with IPv4+UDP headers.  If your network supports
+    // jumbo frames (9000 MTU) raise this to e.g. 8940.
+    Settings.MaximumMtu        = 1452;
+    Settings.IsSet.MaximumMtu  = TRUE;
+ 
+    // How many streams the peer is allowed to open toward us.
+    Settings.PeerBidiStreamCount        = 65535;
+    Settings.IsSet.PeerBidiStreamCount  = TRUE;
+ 
+    // Initial flow-control window for the whole connection (bytes).
+    // Default is 16 KB which is tiny.  Set to 64 MB so the sender is never
+    // stalled waiting for the receiver to grant more credits.
+    Settings.ConnFlowControlWindow        = 64 * 1024 * 1024;
+    Settings.IsSet.ConnFlowControlWindow  = TRUE;
+ 
+    // Initial flow-control window per stream (bytes).  Same reasoning.
+    Settings.StreamRecvWindowDefault        = 64 * 1024 * 1024;
+    Settings.IsSet.StreamRecvWindowDefault  = TRUE;
+ 
+    // How many worker threads MsQuic spins up per processor.
+    // 0 = one thread per logical CPU (default, usually best).
+    // Leave at 0 unless you want to pin to fewer cores.
+    Settings.MaxWorkerQueueDelayUs        = 250;   // 250 µs max queue delay
+    Settings.IsSet.MaxWorkerQueueDelayUs  = TRUE;
+ 
+    // 0-RTT: allow the client to send data before the handshake completes
+    // on resumed connections (saves one round-trip on reconnect).
+    Settings.ResumeEarlyDataEnabled        = TRUE;
+    Settings.IsSet.ResumeEarlyDataEnabled  = TRUE;
+ 
     QUIC_CREDENTIAL_CONFIG CredConfig;
     memset(&CredConfig, 0, sizeof(CredConfig));
     CredConfig.Type  = QUIC_CREDENTIAL_TYPE_NONE;
     CredConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT;
     if (Unsecure)
         CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
-
+ 
     QUIC_STATUS Status;
     if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(
             Registration, &Alpn, 1, &Settings, sizeof(Settings), nullptr, &Configuration))) {
@@ -259,13 +292,40 @@ bool QuicCommunicator::ServerLoadConfiguration(
     _In_reads_(argc) _Null_terminated_ const char* argv[])
 {
     QUIC_SETTINGS Settings = {0};
-    Settings.IdleTimeoutMs                  = 0;
-    Settings.IsSet.IdleTimeoutMs            = TRUE;
-    Settings.ServerResumptionLevel          = QUIC_SERVER_RESUME_AND_ZERORTT;
-    Settings.IsSet.ServerResumptionLevel    = TRUE;
-    Settings.PeerBidiStreamCount            = 65535;
-    Settings.IsSet.PeerBidiStreamCount      = TRUE;
-
+ 
+    Settings.IdleTimeoutMs        = 0;
+    Settings.IsSet.IdleTimeoutMs  = TRUE;
+ 
+    // Allow 0-RTT resumption — client can send data immediately on reconnect.
+    Settings.ServerResumptionLevel        = QUIC_SERVER_RESUME_AND_ZERORTT;
+    Settings.IsSet.ServerResumptionLevel  = TRUE;
+ 
+    // Maximum number of client-initiated bidirectional streams.
+    Settings.PeerBidiStreamCount        = 65535;
+    Settings.IsSet.PeerBidiStreamCount  = TRUE;
+ 
+    // Buffer sends so MsQuic can coalesce multiple StreamSend calls into
+    // fewer UDP packets — critical for throughput.
+    Settings.SendBufferingEnabled        = TRUE;
+    Settings.IsSet.SendBufferingEnabled  = TRUE;
+ 
+    // Match the client MTU.
+    Settings.MaximumMtu        = 1452;
+    Settings.IsSet.MaximumMtu  = TRUE;
+ 
+    // 64 MB connection-level flow control window.
+    Settings.ConnFlowControlWindow        = 64 * 1024 * 1024;
+    Settings.IsSet.ConnFlowControlWindow  = TRUE;
+ 
+    // 64 MB per-stream receive window.
+    Settings.StreamRecvWindowDefault        = 64 * 1024 * 1024;
+    Settings.IsSet.StreamRecvWindowDefault  = TRUE;
+ 
+    // Cap the MsQuic worker queue delay.
+    Settings.MaxWorkerQueueDelayUs        = 250;
+    Settings.IsSet.MaxWorkerQueueDelayUs  = TRUE;
+ 
+    // Credential setup (unchanged logic).
     QUIC_CREDENTIAL_CONFIG_HELPER Config;
     memset(&Config, 0, sizeof(Config));
     Config.CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
@@ -725,77 +785,79 @@ const gvirtus::communicators::Communicator* const QuicCommunicator::Accept() con
 void QuicCommunicator::Connect()
 {
     printf("QuicCommunicator::Connect() called\n");
-
+ 
     int argc = 1;
-    const char* argv[1];
-    argv[0] = (char*)"-unsecure";
-
-    int stream_count = 65535;
+    const char* argv[] = { "-unsecure" };
     QUIC_STATUS Status;
-
+ 
     if (QuicCommunicator::Connection == nullptr) {
-        printf("Connection is null — opening new connection\n");
         std::unique_lock<std::mutex> lock(ConnectMutex);
-
+ 
         InitializeQuic();
-
+ 
         if (!ClientLoadConfiguration(GetFlag(argc, argv, "unsecure")))
             return;
-
+ 
         if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(
                 Registration, ClientConnectionCallbackWrapper, this, &Connection))) {
             printf("ConnectionOpen failed, 0x%x!\n", Status);
             throw "ConnectionOpen failed";
         }
-
+ 
+        // --------------------------------------------------------
+        // Per-connection throughput knobs applied before Start().
+        // --------------------------------------------------------
+ 
+        // How many bidirectional streams we will open toward the server.
+        uint16_t streamCount = 65535;
         MsQuic->SetParam(Connection, QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT,
-                         sizeof(stream_count), &stream_count);
-        MsQuic->SetParam(Connection, QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT,
-                         sizeof(stream_count), &stream_count);
-
+                         sizeof(streamCount), &streamCount);
+ 
+        // Disable the pacing algorithm — pacing spreads sends over time to
+        // reduce burst loss on WAN.  On LAN/localhost it just adds latency.
+        BOOLEAN pacing = FALSE;
+        MsQuic->SetParam(Connection, QUIC_PARAM_CONN_SEND_PACING,
+                         sizeof(pacing), &pacing);
+ 
         printf("[conn][%p] Connecting...\n", Connection);
-
+ 
         if (QUIC_FAILED(Status = MsQuic->ConnectionStart(
                 Connection, Configuration, QUIC_ADDRESS_FAMILY_UNSPEC,
                 mHostname.data(), htons(mPort)))) {
             printf("ConnectionStart failed, 0x%x!\n", Status);
             throw "ConnectionStart failed";
         }
-
+ 
         ConnectionStartCv.wait(lock, [this] { return ConnectEventOccurred; });
     } else {
         printf("Connection already open\n");
     }
-
-    // Open a bidirectional stream.
-    DEBUG_PRINTF("[conn %p] opening stream", Connection);
+ 
+    // Open and start a bidirectional stream.
     if (QUIC_FAILED(Status = MsQuic->StreamOpen(
             Connection, QUIC_STREAM_OPEN_FLAG_NONE,
             ClientStreamCallbackWrapper, this, &Stream))) {
         printf("StreamOpen failed, 0x%x!\n", Status);
         throw "StreamOpen failed";
     }
-
+ 
     if (QUIC_FAILED(Status = MsQuic->StreamStart(Stream, QUIC_STREAM_START_FLAG_NONE))) {
         printf("StreamStart failed, 0x%x!\n", Status);
         MsQuic->StreamClose(Stream);
         throw "StreamStart failed";
     }
-
+ 
     uint32_t sidSize = sizeof(sid);
     MsQuic->GetParam(Stream, QUIC_PARAM_STREAM_ID, &sidSize, &sid);
-
-    // Allocate the ring buffer for this stream.
+ 
     delete recvRing_;
     recvRing_ = new SPSCRingBuffer();
-
-    // Register in the ringmap (used by stream callback to find the ring).
+ 
     {
         std::unique_lock<std::shared_mutex> lk(QuicCommunicator::ringmapMutex);
         QuicCommunicator::ringmap.emplace(sid, recvRing_);
     }
-
-    DEBUG_PRINTF("[sid %lu] stream started, ring @ %p", sid, recvRing_);
+ 
     printf("QuicCommunicator::Connect() returned\n");
 }
 
