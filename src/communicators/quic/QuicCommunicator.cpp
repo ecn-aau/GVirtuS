@@ -222,17 +222,37 @@ bool QuicCommunicator::ClientLoadConfiguration(
     
     QUIC_SETTINGS Settings = {0};
 
-    //
-    // Configures the client's idle timeout.
-    //
+    // No idle timeout - persistent connections for GPU virtualization
     Settings.IdleTimeoutMs = 0;
     Settings.IsSet.IdleTimeoutMs = TRUE;
 
+    // Enable send buffering for better throughput with large GPU data transfers
     Settings.SendBufferingEnabled = FALSE;
     Settings.IsSet.SendBufferingEnabled = TRUE;
 
-    Settings.MaximumMtu = 1200;
+    // Increase MTU closer to Ethernet limit for fewer packets per GPU transfer
+    Settings.MaximumMtu = 1452;
     Settings.IsSet.MaximumMtu = TRUE;
+
+    // Reduce MTU probe failures before giving up
+    Settings.MtuDiscoveryMissingProbeCount = 3;
+    Settings.IsSet.MtuDiscoveryMissingProbeCount = TRUE;
+
+    // Reduce ACK delay for lower RPC latency (default is 25ms)
+    Settings.MaxAckDelayMs = 1;
+    Settings.IsSet.MaxAckDelayMs = TRUE;
+
+    // Large receive window to avoid flow control stalls during CUDA memcpy
+    Settings.StreamRecvWindowDefault = 16 * 1024 * 1024; // 16MB
+    Settings.IsSet.StreamRecvWindowDefault = TRUE;
+
+    // Large connection-level flow control window
+    Settings.ConnFlowControlWindow = 32 * 1024 * 1024; // 32MB
+    Settings.IsSet.ConnFlowControlWindow = TRUE;
+
+    // Enable datagrams for async/fire-and-forget CUDA operations
+    Settings.DatagramReceiveEnabled = TRUE;
+    Settings.IsSet.DatagramReceiveEnabled = TRUE;
 
     //
     // Configures a default client configuration, optionally disabling
@@ -280,24 +300,46 @@ QuicCommunicator::ServerLoadConfiguration(
     )
 {
     QUIC_SETTINGS Settings = {0};
-    //
-    // Configures the server's idle timeout.
-    //
+
+    // No idle timeout
     Settings.IdleTimeoutMs = 0;
     Settings.IsSet.IdleTimeoutMs = TRUE;
-    //
-    // Configures the server's resumption level to allow for resumption and
-    // 0-RTT.
-    //
+
+    // Allow 0-RTT resumption to reduce handshake overhead for reconnecting clients
     Settings.ServerResumptionLevel = QUIC_SERVER_RESUME_AND_ZERORTT;
     Settings.IsSet.ServerResumptionLevel = TRUE;
-    //
-    // Configures the server's settings to allow for the peer to open a single
-    // bidirectional stream. By default connections are not configured to allow
-    // any streams from the peer.
-    //
+
+    // Allow many concurrent streams - one per CUDA API call
     Settings.PeerBidiStreamCount = 65535;
     Settings.IsSet.PeerBidiStreamCount = TRUE;
+
+    // Enable send buffering for better throughput with large GPU data transfers
+    Settings.SendBufferingEnabled = FALSE;
+    Settings.IsSet.SendBufferingEnabled = TRUE;
+
+    // Increase MTU closer to Ethernet limit for fewer packets per GPU transfer
+    Settings.MaximumMtu = 1452;
+    Settings.IsSet.MaximumMtu = TRUE;
+
+    // Reduce MTU probe failures before giving up
+    Settings.MtuDiscoveryMissingProbeCount = 3;
+    Settings.IsSet.MtuDiscoveryMissingProbeCount = TRUE;
+
+    // Reduce ACK delay for lower RPC latency (default is 25ms)
+    Settings.MaxAckDelayMs = 1;
+    Settings.IsSet.MaxAckDelayMs = TRUE;
+
+    // Large receive window to avoid flow control stalls during CUDA memcpy
+    Settings.StreamRecvWindowDefault = 16 * 1024 * 1024; // 16MB
+    Settings.IsSet.StreamRecvWindowDefault = TRUE;
+
+    // Large connection-level flow control window
+    Settings.ConnFlowControlWindow = 32 * 1024 * 1024; // 32MB
+    Settings.IsSet.ConnFlowControlWindow = TRUE;
+
+    // Enable datagrams for async CUDA operations
+    Settings.DatagramReceiveEnabled = TRUE;
+    Settings.IsSet.DatagramReceiveEnabled = TRUE;
 
     QUIC_CREDENTIAL_CONFIG_HELPER Config;
     memset(&Config, 0, sizeof(Config));
