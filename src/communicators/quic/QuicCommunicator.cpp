@@ -231,8 +231,30 @@ bool QuicCommunicator::ClientLoadConfiguration(
     Settings.SendBufferingEnabled = FALSE;
     Settings.IsSet.SendBufferingEnabled = TRUE;
 
-    Settings.MaximumMtu = 1200;
+    Settings.MaximumMtu = 1500;
     Settings.IsSet.MaximumMtu = TRUE;
+
+    Settings.MaxAckDelayMs = 1;
+    Settings.IsSet.MaxAckDelayMs = TRUE;
+
+    Settings.InitialRttMs = 20;
+    Settings.IsSet.InitialRttMs = TRUE;
+
+#ifdef QUIC_API_ENABLE_PREVIEW_FEATURES
+    Settings.CongestionControlAlgorithm = QUIC_CONGESTION_CONTROL_ALGORITHM_BBR;
+#else
+    Settings.CongestionControlAlgorithm = QUIC_CONGESTION_CONTROL_ALGORITHM_CUBIC;
+#endif
+    Settings.IsSet.CongestionControlAlgorithm = TRUE;
+
+    Settings.EcnEnabled = TRUE;
+    Settings.IsSet.EcnEnabled = TRUE;
+
+    Settings.StreamRecvWindowDefault = 16 * 1024 * 1024;
+    Settings.IsSet.StreamRecvWindowDefault = TRUE;
+
+    Settings.ConnFlowControlWindow = 64 * 1024 * 1024;
+    Settings.IsSet.ConnFlowControlWindow = TRUE;
 
     //
     // Configures a default client configuration, optionally disabling
@@ -285,6 +307,35 @@ QuicCommunicator::ServerLoadConfiguration(
     //
     Settings.IdleTimeoutMs = 0;
     Settings.IsSet.IdleTimeoutMs = TRUE;
+
+    Settings.SendBufferingEnabled = FALSE;
+    Settings.IsSet.SendBufferingEnabled = TRUE;
+
+    Settings.MaximumMtu = 1500;
+    Settings.IsSet.MaximumMtu = TRUE;
+
+    Settings.MaxAckDelayMs = 1;
+    Settings.IsSet.MaxAckDelayMs = TRUE;
+
+    Settings.InitialRttMs = 20;
+    Settings.IsSet.InitialRttMs = TRUE;
+
+#ifdef QUIC_API_ENABLE_PREVIEW_FEATURES
+    Settings.CongestionControlAlgorithm = QUIC_CONGESTION_CONTROL_ALGORITHM_BBR;
+#else
+    Settings.CongestionControlAlgorithm = QUIC_CONGESTION_CONTROL_ALGORITHM_CUBIC;
+#endif
+    Settings.IsSet.CongestionControlAlgorithm = TRUE;
+
+    Settings.EcnEnabled = TRUE;
+    Settings.IsSet.EcnEnabled = TRUE;
+
+    Settings.StreamRecvWindowDefault = 16 * 1024 * 1024;
+    Settings.IsSet.StreamRecvWindowDefault = TRUE;
+
+    Settings.ConnFlowControlWindow = 64 * 1024 * 1024;
+    Settings.IsSet.ConnFlowControlWindow = TRUE;
+
     //
     // Configures the server's resumption level to allow for resumption and
     // 0-RTT.
