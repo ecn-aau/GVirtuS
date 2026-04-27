@@ -70,6 +70,9 @@ static bool initialized = false;
 #include <condition_variable>
 
 //#define QUICCOM_DEBUG_LEVEL 0
+//import quic settings
+#include "gvirtus/common/JSON.h"
+#include "QuicSettings.h"
 
 using namespace std;
 using gvirtus::communicators::QuicCommunicator;
@@ -214,56 +217,123 @@ QuicCommunicator::QuicCommunicator(const std::string &communicator) {
 //
 // Helper function to load a client configuration.
 //
-bool QuicCommunicator::ClientLoadConfiguration(
-    BOOLEAN Unsecure
-    )
-{
+bool QuicCommunicator::ClientLoadConfiguration(BOOLEAN Unsecure) {
     DEBUG_PRINTF("called");
     
     QUIC_SETTINGS Settings = {0};
 
-    //
-    // Configures the client's idle timeout.
-    //
-    Settings.IdleTimeoutMs = 0;
-    Settings.IsSet.IdleTimeoutMs = TRUE;
+    try {
+        const char* gvirtus_home = getenv("GVIRTUS_HOME");
+        if (gvirtus_home == nullptr) {
+            printf("GVIRTUS_HOME environment variable not set\n");
+            return FALSE;
+        }
 
-    Settings.SendBufferingEnabled = FALSE;
-    Settings.IsSet.SendBufferingEnabled = TRUE;
+        fs::path settingsPath = fs::path(gvirtus_home) / "etc" / "quic_settings.json";
 
-    Settings.MaximumMtu = 1500;
-    Settings.IsSet.MaximumMtu = TRUE;
+        DEBUG_PRINTF("Loading JSON from %s", settingsPath.c_str());
 
-    Settings.MaxAckDelayMs = 1;
-    Settings.IsSet.MaxAckDelayMs = TRUE;
+        gvirtus::common::JSON<QuicSettingsConfig> jsonLoader(settingsPath);
+        QuicSettingsConfig cfg = jsonLoader.parser();   // <-- IMPORTANT: keep raw config
 
-    Settings.InitialRttMs = 20;
-    Settings.IsSet.InitialRttMs = TRUE;
+        Settings = cfg.ToQuicSettings();
 
-#ifdef QUIC_API_ENABLE_PREVIEW_FEATURES
-    Settings.CongestionControlAlgorithm = QUIC_CONGESTION_CONTROL_ALGORITHM_BBR;
-#else
-    Settings.CongestionControlAlgorithm = QUIC_CONGESTION_CONTROL_ALGORITHM_CUBIC;
-#endif
-    Settings.IsSet.CongestionControlAlgorithm = TRUE;
+        // =========================
+        // VALIDATION + FIXES
+        // =========================
 
-    Settings.EcnEnabled = TRUE;
-    Settings.IsSet.EcnEnabled = TRUE;
+        auto fix_uint16 = [&](const char* name, uint16_t val, uint64_t isSet, uint16_t def) {
+            if (isSet && val == 0) {
+                printf("FIX: %s was 0 → using default %u\n", name, def);
+                return def;
+            }
+            return val;
+        };
 
-    Settings.StreamRecvWindowDefault = 16 * 1024 * 1024;
-    Settings.IsSet.StreamRecvWindowDefault = TRUE;
+        auto fix_uint32 = [&](const char* name, uint32_t val, uint64_t isSet, uint32_t def) {
+            if (isSet && val == 0) {
+                printf("FIX: %s was 0 → using default %u\n", name, def);
+                return def;
+            }
+            return val;
+        };
 
-    Settings.ConnFlowControlWindow = 64 * 1024 * 1024;
-    Settings.IsSet.ConnFlowControlWindow = TRUE;
+        auto fix_uint64 = [&](const char* name, uint64_t val, uint64_t isSet, uint64_t def) {
+            if (isSet && val == 0) {
+                printf("FIX: %s was 0 → using default %lu\n", name, def);
+                return def;
+            }
+            return val;
+        };
+        printf("=== FINAL SETTINGS DUMP ===\n");
 
-    //
-    // Configures a default client configuration, optionally disabling
-    // server certificate validation.
-    //
+        #define PRINT_FIELD(field) \
+            printf("%s = %u (IsSet=%d)\n", #field, (unsigned)Settings.field, Settings.IsSet.field)
+
+        PRINT_FIELD(PeerBidiStreamCount);
+        PRINT_FIELD(PeerUnidiStreamCount);
+        PRINT_FIELD(StreamRecvWindowDefault);
+        PRINT_FIELD(ConnFlowControlWindow);
+        PRINT_FIELD(InitialWindowPackets);
+        PRINT_FIELD(MaxAckDelayMs);
+        PRINT_FIELD(MaximumMtu);
+        PRINT_FIELD(MinimumMtu);
+
+        #undef PRINT_FIELD
+
+        // Critical fields
+        fix_uint16("PeerBidiStreamCount",
+            Settings.PeerBidiStreamCount,
+            Settings.IsSet.PeerBidiStreamCount,
+            65535);
+
+        fix_uint16("PeerUnidiStreamCount",
+            Settings.PeerUnidiStreamCount,
+            Settings.IsSet.PeerUnidiStreamCount,
+            65535);
+
+        fix_uint32("StreamRecvWindowDefault",
+            Settings.StreamRecvWindowDefault,
+            Settings.IsSet.StreamRecvWindowDefault,
+            65536);
+
+        fix_uint32("ConnFlowControlWindow",
+            Settings.ConnFlowControlWindow,
+            Settings.IsSet.ConnFlowControlWindow,
+            65536);
+
+        fix_uint32("InitialWindowPackets",
+            Settings.InitialWindowPackets,
+            Settings.IsSet.InitialWindowPackets,
+            10);
+
+        fix_uint64("IdleTimeoutMs",
+            Settings.IdleTimeoutMs,
+            Settings.IsSet.IdleTimeoutMs,
+            30000);
+
+        DEBUG_PRINTF("FINAL SETTINGS:");
+        DEBUG_PRINTF("PeerBidiStreamCount=%u (IsSet=%d)",
+            Settings.PeerBidiStreamCount, Settings.IsSet.PeerBidiStreamCount);
+        DEBUG_PRINTF("PeerUnidiStreamCount=%u (IsSet=%d)",
+            Settings.PeerUnidiStreamCount, Settings.IsSet.PeerUnidiStreamCount);
+        DEBUG_PRINTF("StreamRecvWindowDefault=%u (IsSet=%d)",
+            Settings.StreamRecvWindowDefault, Settings.IsSet.StreamRecvWindowDefault);
+        DEBUG_PRINTF("ConnFlowControlWindow=%u (IsSet=%d)",
+            Settings.ConnFlowControlWindow, Settings.IsSet.ConnFlowControlWindow);
+        DEBUG_PRINTF("IdleTimeoutMs=%lu (IsSet=%d)",
+            Settings.IdleTimeoutMs, Settings.IsSet.IdleTimeoutMs);
+
+    } catch (const std::exception& e) {
+        printf("Failed to load/parse quic_settings.json: %s\n", e.what());
+        return FALSE;
+    }
+
     QUIC_CREDENTIAL_CONFIG CredConfig;
     memset(&CredConfig, 0, sizeof(CredConfig));
     CredConfig.Type = QUIC_CREDENTIAL_TYPE_NONE;
     CredConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT;
+
     if (Unsecure) {
         CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
     }
@@ -289,7 +359,6 @@ bool QuicCommunicator::ClientLoadConfiguration(
 
     return TRUE;
 }
-
 
 //
 // Helper function to load a server configuration. Uses the command line
