@@ -104,6 +104,7 @@ run-simple-matrix-test:
 		-v ./plugins:/opt/GVirtuS/plugins \
 		-v ./src:/opt/GVirtuS/src \
 		-v ./examples/simple_matrix/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./examples/etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
 		-v ./examples/simple_matrix:/opt/GVirtuS/examples/simple_matrix \
 		-v ./examples/simple_matrix/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
 		gvirtus:cuda12.6 \
