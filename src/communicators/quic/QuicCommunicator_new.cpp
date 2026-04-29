@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <iostream>
 #include <fcntl.h>
 #include <gvirtus/communicators/Endpoint_Quic.h>
 #include "QuicCommunicator_new.h"
@@ -6,6 +7,7 @@
 // =============================================================================
 // Debug printing macro
 // =============================================================================
+#define DEBUG
 
 #ifdef QUICCOM_DEBUG_LEVEL
     #define DEBUG_PRINTF(fmt, ...) do { printf("[tid %lu] [%s:%d] " fmt "\n", syscall(SYS_gettid),__PRETTY_FUNCTION__, __LINE__, ##__VA_ARGS__); } while(0)
@@ -77,11 +79,22 @@ uint32_t DecodeHexBuffer(const char* HexBuffer, uint32_t OutBufferLen, uint8_t* 
 
 namespace gvirtus::communicators {
 
-QuicCommunicator::QuicCommunicator(const QuicCommunicator& other) {
-    mHostname = other.mHostname;
-    mPort = other.mPort;
-    DefaultStream = NULL;
-    Listener = NULL;
+QuicCommunicator::QuicCommunicator(const QuicCommunicator& other)
+    : Listener(nullptr),
+      receivedConnection(nullptr),
+      cv(),
+      listenerMutex(),
+      connectionEventOcurred(false),
+      listenerStarted(false),
+      Connection(nullptr),
+      Registration(other.Registration),
+      Configuration(other.Configuration),
+      DefaultStream(nullptr),
+      Settings(other.Settings),
+      mHostname(other.mHostname),
+      mPort(other.mPort)
+{
+    std::cout << "QuicCommunicator copy constructor called" << std::endl;
 }
 
 QuicCommunicator::QuicCommunicator(const std::string &communicator) {
@@ -142,7 +155,20 @@ void QuicCommunicator::Serve() {
         printf("ListenerOpen failed, 0x%x!\n", Status);
         throw std::runtime_error("ListenerOpen failed");
     }
-    sleep(1);
+
+    std::cout << "QuicCommunicator::Accept() called, waiting for connection..." << std::endl;
+
+    QUIC_ADDR Address = {0};
+    QuicAddrSetFamily(&Address, QUIC_ADDRESS_FAMILY_UNSPEC);
+    QuicAddrSetPort(&Address, mPort);
+
+    // if (listenerStarted == false){
+    if (QUIC_FAILED(Status = MsQuic->ListenerStart(Listener, &Alpn, 1, &Address))) {
+        throw std::runtime_error("ListenerStart failed");
+    }
+        // listenerStarted = true;
+    printf("ListenerStart returned 0x%x\n", Status);
+    // }
     //
 #ifdef DEBUG
     printf("QuicCommunicator::Serve() returned\n");
@@ -154,46 +180,40 @@ const gvirtus::communicators::Communicator *const QuicCommunicator::Accept() con
 
     // Wait for connection request to arrive.
     std::unique_lock<std::mutex> lock(listenerMutex);
-    listernerCv.wait(lock, [this] { return connectionEventOcurred; });
+
+    cv.wait(lock, [this] { return connectionEventOcurred; });
     
-    QUIC_STATUS Status;
+    std::cout<< "Connection event occurred, processing connection... "<< receivedConnection << std::endl;
+    
 
-    QUIC_ADDR Address = {0};
-    QuicAddrSetFamily(&Address, QUIC_ADDRESS_FAMILY_UNSPEC);
-    QuicAddrSetPort(&Address, htons(mPort));
-
-    if (listenerStarted == false){
-        if (QUIC_FAILED(Status = MsQuic->ListenerStart(Listener, &Alpn, 1, &Address))) {
-            throw std::runtime_error("ListenerStart failed");
-        }
-        listenerStarted = true;
-
-    }
-
-    listernerCv.wait(lock, [this] { return connectionEventOcurred; });
     DEBUG_PRINTF("New Connection Received\n");
 
-    if (receivedConnection == NULL) {
-        throw std::runtime_error("Received connection is null");
-    }
-
     int stream_count = 65535;
-
-    QuicCommunicator* newQuicCommunicator = new QuicCommunicator(*this);
+    QuicCommunicator* newQuicCommunicator = newQuicCommunicator = new QuicCommunicator(*this);
     newQuicCommunicator->Connection = receivedConnection;
-    newQuicCommunicator->InitializeQuic();
-    newQuicCommunicator->MsQuic->SetCallbackHandler(newQuicCommunicator->Connection, (void*) ServerConnectionCallbackWrapper, NULL);
+    newQuicCommunicator->MsQuic->SetCallbackHandler(newQuicCommunicator->Connection, (void*) ServerConnectionCallbackWrapper, newQuicCommunicator);
+    newQuicCommunicator->MsQuic->ConnectionSetConfiguration(newQuicCommunicator->Connection, Configuration);
     newQuicCommunicator->MsQuic->SetParam(newQuicCommunicator->Connection, QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT, sizeof(int), &stream_count);
     newQuicCommunicator->MsQuic->SetParam(newQuicCommunicator->Connection, QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT, sizeof(int), &stream_count);
-
     receivedConnection = NULL;
     connectionEventOcurred = false;
 
     // TODO: maybe this communicator shoudl be saved to a list of communicators so that in async the server can handle multiple reads
-
     return newQuicCommunicator; //new 
 }
 
+void QuicCommunicator::Sync() {}
+
+void QuicCommunicator::Close() {
+    printf("QuicCommunicator::Close\n");
+    if (DefaultStream!=NULL)
+        MsQuic->StreamClose(DefaultStream);
+    if (Connection != NULL)
+        MsQuic->ConnectionClose(Connection);
+
+    // TODO: This should probably do more stuff
+
+}
 
 // Client
 
@@ -203,36 +223,42 @@ void QuicCommunicator::Connect() {
     printf("QuicCommunicator::Connect() called\n");
 #endif
 
-    if (Connection != nullptr) {
+    if (Connection != NULL) {
         printf("Connection is already open\n");
         return;
     }
-
-    InitializeQuic();
-
+    this->InitializeQuic();
     QUIC_STATUS Status;
     // TODO REDO CLIENT LOAD CONFIGURATION
-    if (!ClientLoadConfiguration(true)) {
+    if (!ClientLoadConfiguration(false)) {
         return;
     }
 
-    if (QUIC_FAILED(Status = MsQuic->ConnectionOpen(Registration, ClientConnectionCallbackWrapper, this, &Connection))) {
-        printf("ConnectionOpen failed, 0x%x!\n", Status);
-        throw std::runtime_error("ConnectionOpen failed");
-    }
+    Status = MsQuic->ConnectionOpen(Registration, ClientConnectionCallbackWrapper, this, &Connection);
+
     int stream_count = 65535;
     MsQuic->SetParam(Connection, QUIC_PARAM_CONN_LOCAL_BIDI_STREAM_COUNT, sizeof(stream_count), &stream_count);
     MsQuic->SetParam(Connection, QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT, sizeof(stream_count), &stream_count);
 
+    std::cout << "[conn][" << Connection << "] Connecting..." << std::endl;
+    std::cout << "hostname: " << mHostname << std::endl;
+    std::cout << "port: " << mPort << std::endl; 
 
-    // Start Connection
-    if (QUIC_FAILED(Status = MsQuic->ConnectionStart(QuicCommunicator::Connection, Configuration, QUIC_ADDRESS_FAMILY_UNSPEC, mHostname.data(), htons(mPort)))) {
-        printf("ConnectionStart failed, 0x%x!\n", Status);
-        throw std::runtime_error("ConnectionStart failed");
+
+    Status = MsQuic->ConnectionStart(Connection, Configuration, QUIC_ADDRESS_FAMILY_UNSPEC, mHostname.data(), mPort);
+    std::cout << "ConnectionStart returned " << Status << std::endl;
+
+    {
+        std::cout << "Waiting for lock event..." << std::endl;
+        std::unique_lock<std::mutex> lock(listenerMutex);
+        std::cout << "Waiting for connection event..." << std::endl;
+        cv.wait(lock, [this] { return connectionEventOcurred; });
     }
-    
+
+
+
     // Open Default Stream
-    if (QUIC_FAILED(Status = MsQuic->StreamOpen(Connection, QUIC_STREAM_OPEN_FLAG_NONE, ClientStreamCallbackWrapper, nullptr, &DefaultStream))) {
+    if (QUIC_FAILED(Status = MsQuic->StreamOpen(Connection, QUIC_STREAM_OPEN_FLAG_NONE, ClientStreamCallbackWrapper, this, &DefaultStream))) {
         printf("StreamOpen failed, 0x%x!\n", Status);
         throw std::runtime_error("StreamOpen failed");
     }
@@ -245,6 +271,7 @@ void QuicCommunicator::Connect() {
     }
 
 
+    multiStreams[DefaultStream] = InitializePipes();
     // TODO: NEED TO LOOK INTO PIPES!!
 }
 
@@ -253,8 +280,8 @@ void QuicCommunicator::Connect() {
 // Private methods
 // =============================================================================
 
-void QuicCommunicator::InitializeQuic(void) {
-    DEBUG_PRINTF("QuicCommunicator::InitializeQuic() called");
+void QuicCommunicator::InitializeQuic() {
+    std::cout << "QuicCommunicator::InitializeQuic() called" << std::endl;
     DefaultStream = NULL;
 
     QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
@@ -280,8 +307,8 @@ Pipes gvirtus::communicators::QuicCommunicator::InitializePipes() {
     Pipes fdPipes {pipes[0], pipes[1]};
 
     int pipe_size = 4096 * 4096 * 4; // 1MB buffer or adjust as needed
-    fcntl(fdPipes.in, F_SETPIPE_SZ, pipe_size);
-    fcntl(fdPipes.out, F_SETPIPE_SZ, pipe_size);
+    fcntl(fdPipes.read, F_SETPIPE_SZ, pipe_size);
+    fcntl(fdPipes.write, F_SETPIPE_SZ, pipe_size);
 
     return fdPipes;
 }
@@ -300,6 +327,9 @@ bool QuicCommunicator::ServerLoadConfiguration(int argc, const char* argv[])
     Settings.MaximumMtu = 1200;
     Settings.IsSet.MaximumMtu = TRUE;
 
+    Settings.PeerBidiStreamCount = 65535;
+    Settings.IsSet.PeerBidiStreamCount = TRUE;
+
     QUIC_CREDENTIAL_CONFIG_HELPER Config;
     memset(&Config, 0, sizeof(Config));
     Config.CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
@@ -317,6 +347,7 @@ bool QuicCommunicator::ServerLoadConfiguration(int argc, const char* argv[])
                 sizeof(Config.CertHash.ShaHash),
                 Config.CertHash.ShaHash);
         if (CertHashLen != sizeof(Config.CertHash.ShaHash)) {
+            std::cout << "Invalid certificate hash length: " << CertHashLen << std::endl;
             return FALSE;
         }
         Config.CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_HASH;
@@ -368,15 +399,61 @@ bool QuicCommunicator::ServerLoadConfiguration(int argc, const char* argv[])
 }
 
 bool QuicCommunicator::ClientLoadConfiguration(bool secure) {
-    // TODO: Add Client Load Configuration
-    return true;
+    DEBUG_PRINTF("called");
+    
+    QUIC_SETTINGS Settings = {0};
+
+    //
+    // Configures the client's idle timeout.
+    //
+    Settings.IdleTimeoutMs = 0;
+    Settings.IsSet.IdleTimeoutMs = TRUE;
+
+    Settings.SendBufferingEnabled = FALSE;
+    Settings.IsSet.SendBufferingEnabled = TRUE;
+
+    Settings.MaximumMtu = 1200;
+    Settings.IsSet.MaximumMtu = TRUE;
+
+    //
+    // Configures a default client configuration, optionally disabling
+    // server certificate validation.
+    //
+    QUIC_CREDENTIAL_CONFIG CredConfig;
+    memset(&CredConfig, 0, sizeof(CredConfig));
+    CredConfig.Type = QUIC_CREDENTIAL_TYPE_NONE;
+    CredConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT;
+    if (!secure) {
+        CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
+    }
+
+    //
+    // Allocate/initialize the configuration object, with the configured ALPN
+    // and settings.
+    //
+    QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
+    if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration, &Alpn, 1, &Settings, sizeof(Settings), NULL, &Configuration))) {
+        printf("ConfigurationOpen failed, 0x%x!\n", Status);
+        return FALSE;
+    }
+
+    //
+    // Loads the TLS credential part of the configuration. This is required even
+    // on client side, to indicate if a certificate is required or not.
+    //
+    if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(Configuration, &CredConfig))) {
+        printf("ConfigurationLoadCredential failed, 0x%x!\n", Status);
+        return FALSE;
+    }
+
+    return TRUE;
 }
 
 // =============================================================================
 // Callbacks
 // =============================================================================
 
-QUIC_STATUS ServerListenerCallbackWrapper(HQUIC Listener, void* Context, QUIC_LISTENER_EVENT* Event) {
+QUIC_STATUS QuicCommunicator::ServerListenerCallbackWrapper(HQUIC Listener, void* Context, QUIC_LISTENER_EVENT* Event) {
     auto quicCommunicator = static_cast<QuicCommunicator*>(Context);
     return quicCommunicator->ServerListenerCallback(Listener, Context, Event);
 }
@@ -391,26 +468,36 @@ QUIC_STATUS QuicCommunicator::ServerListenerCallback(HQUIC Listener, void* Conte
         case QUIC_LISTENER_EVENT_NEW_CONNECTION:
             printf("QUIC_LISTENER_EVENT_NEW_CONNECTION\n");
 
-            receivedConnection = Event->NEW_CONNECTION.Connection;
-            connectionEventOcurred = true;
-            listernerCv.notify_one();
-            break;
+            {
+                std::scoped_lock<std::mutex> lock(listenerMutex);
+                receivedConnection = Event->NEW_CONNECTION.Connection;
+                connectionEventOcurred = true;
+                cv.notify_one();
+            }
+
+            usleep(20); // TODO: this should be replaced by a condition variable that waits for the connection event to be processed before accepting new connections, otherwise
+
+            return QUIC_STATUS_SUCCESS;
+
         case QUIC_LISTENER_EVENT_STOP_COMPLETE:
             printf("QUIC_LISTENER_EVENT_STOP_COMPLETE received.\n");
             break;
+
         case QUIC_LISTENER_EVENT_DOS_MODE_CHANGED:
             printf("QUIC_LISTENER_EVENT_DOS_MODE_CHANGED received.\n");
             break;
+
         default:
             break;
         }
-    
+
     return Status;
 }
 
 
-QUIC_STATUS ServerConnectionCallbackWrapper(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event) {
+QUIC_STATUS QuicCommunicator::ServerConnectionCallbackWrapper(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event) {
     auto quicCommunicator = static_cast<QuicCommunicator*>(Context);
+    std::cout << "QuicCommunicator::ServerConnectionCallbackWrapper called with Connection: " << Connection << " in instance " << quicCommunicator << std::endl;
     return quicCommunicator->ServerConnectionCallback(Connection, Context, Event);
 }
 
@@ -453,22 +540,33 @@ QUIC_STATUS QuicCommunicator::ServerConnectionCallback(HQUIC Connection, void* C
         break;
         
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
-        if (DefaultStream == nullptr) {
-            DefaultStream = Event->PEER_STREAM_STARTED.Stream;
-        }
+
+        std::cout << "QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED received. Stream: " << Event->PEER_STREAM_STARTED.Stream << std::endl;
+        std::cout << "DefaultStream: " << DefaultStream << std::endl;
         {
             std::scoped_lock(multiStreamMutex);
+            if (DefaultStream == nullptr) {
+                DefaultStream = Event->PEER_STREAM_STARTED.Stream;
+                std::cout << "DefaultStream set to: " << DefaultStream << std::endl;
+            }
+            MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream, (void *) ServerStreamCallbackWrapper, this);
             multiStreams[Event->PEER_STREAM_STARTED.Stream] = InitializePipes();
+            
+            // Notify Read that a new stream has been created and is ready to be used
+            cv.notify_all();
         }
+
+        break;
 
     default:
         printf("Unkown or unsupported Connection event %i", Event->Type);
         break;
     }
+    std::cout << "Received connection event type: " << Event->Type << ", exiting ServerConnectionCallback with success" << std::endl;
     return QUIC_STATUS_SUCCESS;
 }
 
-QUIC_STATUS ServerStreamCallbackWrapper(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event) {
+QUIC_STATUS QuicCommunicator::ServerStreamCallbackWrapper(HQUIC Stream, void* Context, QUIC_STREAM_EVENT* Event) {
     auto quicCommunicator = static_cast<QuicCommunicator*>(Context);
     return quicCommunicator->ServerStreamCallback(Stream, Context, Event);
 }
@@ -489,13 +587,11 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
             return QUIC_STATUS_SUCCESS;
 
         case QUIC_STREAM_EVENT_RECEIVE:
-
             if (multiStreams.find(Stream) == multiStreams.end()) {
-                DEBUG_PRINTF("[sid %lu] Pipe not found for stream %p\n", sid, Stream);
                 return QUIC_STATUS_NOT_FOUND;
             }
             else {
-                wp = multiStreams[Stream].out;
+                wp = multiStreams[Stream].write;
                 DEBUG_PRINTF("[sid %lu] Get pipe %d for stream %p\n", sid, wp, Stream);
             }
 
@@ -511,6 +607,7 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
                 }
                 DEBUG_PRINTF("[sid %lu] [strm %p] [pipe %d] Data written %u, flags %d\n", sid, Stream, wp, b->Length, Event->RECEIVE.Flags);
             }
+
             return QUIC_STATUS_SUCCESS;
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
@@ -528,8 +625,8 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
             
             if (multiStreams.find(Stream) != multiStreams.end()) {
                 std::scoped_lock(multiStreamMutex);
-                close(multiStreams[Stream].in);
-                close(multiStreams[Stream].out);
+                close(multiStreams[Stream].read);
+                close(multiStreams[Stream].write);
                 multiStreams.erase(Stream);
 
             }
@@ -541,7 +638,7 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
     return QUIC_STATUS_NOT_FOUND;
 }
 
-QUIC_STATUS ClientConnectionCallbackWrapper(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event) {
+QUIC_STATUS QuicCommunicator::ClientConnectionCallbackWrapper(HQUIC Connection, void* Context, QUIC_CONNECTION_EVENT* Event) {
     auto quicCommunicator = static_cast<QuicCommunicator*>(Context);
     return quicCommunicator->ClientConnectionCallback(Connection, Context, Event);
 }
@@ -550,8 +647,13 @@ QUIC_STATUS QuicCommunicator::ClientConnectionCallback(HQUIC Connection, void* C
 
     switch (Event->Type) {
         case QUIC_CONNECTION_EVENT_CONNECTED:
-            DEBUG_PRINTF("[conn][%p] Connected\n", Connection);
-            Connection=Connection;
+            {
+                std::scoped_lock<std::mutex> lock(listenerMutex);
+                this->Connection=Connection;
+                connectionEventOcurred = true;
+                cv.notify_one();
+            }
+            usleep(10); // TODO: this should be replaced by a condition variable that waits
             break;
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
@@ -608,10 +710,10 @@ QUIC_STATUS QuicCommunicator::ClientStreamCallback(HQUIC Stream, void* Context, 
                 return QUIC_STATUS_NOT_FOUND;
             }
             else {
-                wp = multiStreams[Stream].out;
+                wp = multiStreams[Stream].write;
                 DEBUG_PRINTF("[sid %lu] Get pipe %d for stream %p\n", sid, wp, Stream);
             }
-
+            
             for (uint32_t i = 0; i < Event->RECEIVE.BufferCount; ++i) {
                 
                 const QUIC_BUFFER* b = &Event->RECEIVE.Buffers[i];
@@ -658,11 +760,14 @@ size_t QuicCommunicator::Read(char *buffer, size_t size) {
     ssize_t ret_value=0;
     ssize_t size_left=size;
 
+    std::unique_lock<std::mutex> lock(listenerMutex);
+    cv.wait(lock, [this] { return multiStreams.find(DefaultStream) != multiStreams.end(); });
+    // std::cout << "Pipe for DefaultStream is ready, proceeding with read" << std::endl;
+
     while(size_left>0) {
 
         DEBUG_PRINTF("[sid %lu] QuicCommunicator::Read() Block on read() %ld %lu %lu\n", sid, ret_value,size,size_left);
-
-        ssize_t r = read(multiStreams[DefaultStream].in, buffer+ret_value, size_left);
+        ssize_t r = read(multiStreams[DefaultStream].read, buffer+ret_value, size_left);
 
         if (r < 0) {
             DEBUG_PRINTF("errno %d\n",errno);
@@ -748,18 +853,18 @@ size_t QuicCommunicator::Write(const char *buffer, size_t size) {
 
     return size;
 }
+};
 
 // =============================================================================
 // Factory function
 // =============================================================================
 
-extern "C" std::shared_ptr <QuicCommunicator> create_communicator(
+extern "C" std::shared_ptr <gvirtus::communicators::QuicCommunicator> create_communicator(
         std::shared_ptr <gvirtus::communicators::Endpoint> end) {
     std::string arg =
             "quic://" +
             std::dynamic_pointer_cast<gvirtus::communicators::Endpoint_Quic>(end)->address() +
             ":" +
             std::to_string(std::dynamic_pointer_cast<gvirtus::communicators::Endpoint_Quic>(end)->port());
-    return std::make_shared<QuicCommunicator>(arg);
+    return std::make_shared<gvirtus::communicators::QuicCommunicator>(arg);
 }
-};

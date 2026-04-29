@@ -27,8 +27,8 @@ typedef struct QUIC_CREDENTIAL_CONFIG_HELPER {
 const QUIC_BUFFER Alpn = { sizeof("gvirtus") - 1, (uint8_t*)"gvirtus" };
 
 struct Pipes {
-    int in;
-    int out;
+    int read;
+    int write;
 };
 
 class QuicCommunicator : public gvirtus::communicators::Communicator {
@@ -44,6 +44,7 @@ public:
     size_t Write(const char *buffer, size_t size);
     void Sync();
     void Close();
+    std::string to_string() override { return "quiccommunicator"; }
 
     // Callbacks - Must be public due to Wrapper calling object callbacks
     QUIC_STATUS ServerListenerCallback(HQUIC Listener, void* Context, QUIC_LISTENER_EVENT* Event);
@@ -74,7 +75,7 @@ private:
     // Listener objects
     HQUIC Listener;
     mutable HQUIC receivedConnection;
-    mutable std::condition_variable listernerCv;
+    mutable std::condition_variable cv;
     mutable std::mutex listenerMutex;
     mutable bool connectionEventOcurred = false;
     mutable bool listenerStarted = false;
@@ -84,7 +85,7 @@ private:
     static inline const QUIC_API_TABLE* MsQuic = nullptr;
     HQUIC Registration;
     HQUIC Configuration;
-    HQUIC DefaultStream;
+    HQUIC DefaultStream{nullptr};
     QUIC_SETTINGS Settings = {0};
 
     // map of streams and their corresponding pipes. The key is the stream id, which is a 62 bit unsigned integer.
