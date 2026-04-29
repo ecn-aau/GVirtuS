@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gvirtus/communicators/Communicator.h"
+#include "QuicSettings.h"
 #include "msquic.h"
 
 #include <thread>
@@ -66,7 +67,7 @@ private:
     Pipes InitializePipes();
     bool ServerLoadConfiguration(int argc, const char* argv[] );
     bool ClientLoadConfiguration(bool unsecure);
-
+    bool LoadQuicSettingsFromJson(QUIC_SETTINGS& Settings);
 
 
     // !! Mutables are needed because Accept is a const function. (Should find a better solution)

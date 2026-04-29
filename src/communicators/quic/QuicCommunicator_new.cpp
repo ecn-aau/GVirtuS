@@ -79,6 +79,105 @@ uint32_t DecodeHexBuffer(const char* HexBuffer, uint32_t OutBufferLen, uint8_t* 
 
 namespace gvirtus::communicators {
 
+// =========================
+// SHARED SETTINGS LOADER
+// =========================
+bool QuicCommunicator::LoadQuicSettingsFromJson(QUIC_SETTINGS& Settings) {
+    try {
+        const char* gvirtus_home = getenv("GVIRTUS_HOME");
+        if (gvirtus_home == nullptr) {
+            printf("GVIRTUS_HOME environment variable not set\n");
+            return FALSE;
+        }
+
+        fs::path settingsPath = fs::path(gvirtus_home) / "etc" / "quic_settings.json";
+
+        DEBUG_PRINTF("Loading JSON from %s", settingsPath.c_str());
+
+        gvirtus::common::JSON<QuicSettingsConfig> jsonLoader(settingsPath);
+        QuicSettingsConfig cfg = jsonLoader.parser();
+
+        Settings = cfg.ToQuicSettings();
+
+        // =========================
+        // VALIDATION
+        // =========================
+        auto fix_uint16 = [&](const char* name, uint16_t val, uint64_t isSet, uint16_t def) {
+            if (isSet && val == 0) {
+                printf("FIX: %s was 0 → using default %u\n", name, def);
+                return def;
+            }
+            return val;
+        };
+
+        auto fix_uint32 = [&](const char* name, uint32_t val, uint64_t isSet, uint32_t def) {
+            if (isSet && val == 0) {
+                printf("FIX: %s was 0 → using default %u\n", name, def);
+                return def;
+            }
+            return val;
+        };
+
+        auto fix_uint64 = [&](const char* name, uint64_t val, uint64_t isSet, uint64_t def) {
+            if (isSet && val == 0) {
+                printf("FIX: %s was 0 → using default %lu\n", name, def);
+                return def;
+            }
+            return val;
+        };
+
+        Settings.PeerBidiStreamCount = fix_uint16(
+            "PeerBidiStreamCount",
+            Settings.PeerBidiStreamCount,
+            Settings.IsSet.PeerBidiStreamCount,
+            65535);
+
+        Settings.PeerUnidiStreamCount = fix_uint16(
+            "PeerUnidiStreamCount",
+            Settings.PeerUnidiStreamCount,
+            Settings.IsSet.PeerUnidiStreamCount,
+            65535);
+
+        Settings.StreamRecvWindowDefault = fix_uint32(
+            "StreamRecvWindowDefault",
+            Settings.StreamRecvWindowDefault,
+            Settings.IsSet.StreamRecvWindowDefault,
+            65536);
+
+        Settings.ConnFlowControlWindow = fix_uint32(
+            "ConnFlowControlWindow",
+            Settings.ConnFlowControlWindow,
+            Settings.IsSet.ConnFlowControlWindow,
+            65536);
+
+        Settings.InitialWindowPackets = fix_uint32(
+            "InitialWindowPackets",
+            Settings.InitialWindowPackets,
+            Settings.IsSet.InitialWindowPackets,
+            10);
+
+        Settings.IdleTimeoutMs = fix_uint64(
+            "IdleTimeoutMs",
+            Settings.IdleTimeoutMs,
+            Settings.IsSet.IdleTimeoutMs,
+            30000);
+
+        printf("=== QUIC SETTINGS LOADED ===\n");
+        printf("PeerBidiStreamCount = %u\n", Settings.PeerBidiStreamCount);
+        printf("PeerUnidiStreamCount = %u\n", Settings.PeerUnidiStreamCount);
+        printf("StreamRecvWindowDefault = %u\n", Settings.StreamRecvWindowDefault);
+        printf("ConnFlowControlWindow = %u\n", Settings.ConnFlowControlWindow);
+        printf("IdleTimeoutMs = %lu\n", Settings.IdleTimeoutMs);
+
+    } catch (const std::exception& e) {
+        printf("Failed to load/parse quic_settings.json: %s\n", e.what());
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+
 QuicCommunicator::QuicCommunicator(const QuicCommunicator& other)
     : Listener(nullptr),
       receivedConnection(nullptr),
@@ -317,48 +416,51 @@ bool QuicCommunicator::ServerLoadConfiguration(int argc, const char* argv[])
 {
 
 
-    // TODO: DELETE WHEN IT IS CONFIGURABLE
-    Settings.IdleTimeoutMs = 0;
-    Settings.IsSet.IdleTimeoutMs = TRUE;
+        QUIC_SETTINGS Settings = {0};
 
-    Settings.SendBufferingEnabled = FALSE;
-    Settings.IsSet.SendBufferingEnabled = TRUE;
+    // =========================
+    // LOAD SHARED SETTINGS
+    // =========================
+    if (!LoadQuicSettingsFromJson(Settings)) {
+        return FALSE;
+    }
 
-    Settings.MaximumMtu = 1200;
-    Settings.IsSet.MaximumMtu = TRUE;
+    // =========================
+    // SERVER-SPECIFIC SETTINGS
+    // =========================
+    Settings.ServerResumptionLevel = QUIC_SERVER_RESUME_AND_ZERORTT;
+    Settings.IsSet.ServerResumptionLevel = TRUE;
 
-    Settings.PeerBidiStreamCount = 65535;
-    Settings.IsSet.PeerBidiStreamCount = TRUE;
-
+    // =========================
+    // CERT CONFIG
+    // =========================
     QUIC_CREDENTIAL_CONFIG_HELPER Config;
     memset(&Config, 0, sizeof(Config));
     Config.CredConfig.Flags = QUIC_CREDENTIAL_FLAG_NONE;
 
     const char* Cert;
     const char* KeyFile;
+
     if ((Cert = GetValue(argc, argv, "cert_hash")) != NULL) {
-        //
-        // Load the server's certificate from the default certificate store,
-        // using the provided certificate hash.
-        //
+
         uint32_t CertHashLen =
             DecodeHexBuffer(
                 Cert,
                 sizeof(Config.CertHash.ShaHash),
                 Config.CertHash.ShaHash);
+
         if (CertHashLen != sizeof(Config.CertHash.ShaHash)) {
-            std::cout << "Invalid certificate hash length: " << CertHashLen << std::endl;
             return FALSE;
         }
+
         Config.CredConfig.Type = QUIC_CREDENTIAL_TYPE_CERTIFICATE_HASH;
         Config.CredConfig.CertificateHash = &Config.CertHash;
 
     } else if ((Cert = GetValue(argc, argv, "cert_file")) != NULL &&
                (KeyFile = GetValue(argc, argv, "key_file")) != NULL) {
-        //
-        // Loads the server's certificate from the file.
-        //
+
         const char* Password = GetValue(argc, argv, "password");
+
         if (Password != NULL) {
             Config.CertFileProtected.CertificateFile = (char*)Cert;
             Config.CertFileProtected.PrivateKeyFile = (char*)KeyFile;
@@ -377,20 +479,28 @@ bool QuicCommunicator::ServerLoadConfiguration(int argc, const char* argv[])
         return FALSE;
     }
 
-    //
-    // Allocate/initialize the configuration object, with the configured ALPN
-    // and settings.
-    //
+    // =========================
+    // APPLY CONFIG
+    // =========================
     QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-    if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration, &Alpn, 1, &Settings, sizeof(Settings), NULL, &Configuration))) {
+
+    if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(
+            Registration,
+            &Alpn,
+            1,
+            &Settings,
+            sizeof(Settings),
+            NULL,
+            &Configuration))) {
+
         printf("ConfigurationOpen failed, 0x%x!\n", Status);
         return FALSE;
     }
 
-    //
-    // Loads the TLS credential part of the configuration.
-    //
-    if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(Configuration, &Config.CredConfig))) {
+    if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
+            Configuration,
+            &Config.CredConfig))) {
+
         printf("ConfigurationLoadCredential failed, 0x%x!\n", Status);
         return FALSE;
     }
@@ -399,50 +509,48 @@ bool QuicCommunicator::ServerLoadConfiguration(int argc, const char* argv[])
 }
 
 bool QuicCommunicator::ClientLoadConfiguration(bool secure) {
-    DEBUG_PRINTF("called");
-    
+
     QUIC_SETTINGS Settings = {0};
 
-    //
-    // Configures the client's idle timeout.
-    //
-    Settings.IdleTimeoutMs = 0;
-    Settings.IsSet.IdleTimeoutMs = TRUE;
+    // =========================
+    // LOAD SHARED SETTINGS
+    // =========================
+    if (!LoadQuicSettingsFromJson(Settings)) {
+        return FALSE;
+    }
 
-    Settings.SendBufferingEnabled = FALSE;
-    Settings.IsSet.SendBufferingEnabled = TRUE;
-
-    Settings.MaximumMtu = 1200;
-    Settings.IsSet.MaximumMtu = TRUE;
-
-    //
-    // Configures a default client configuration, optionally disabling
-    // server certificate validation.
-    //
+    // =========================
+    // QUIC CONFIGURATION
+    // =========================
     QUIC_CREDENTIAL_CONFIG CredConfig;
     memset(&CredConfig, 0, sizeof(CredConfig));
     CredConfig.Type = QUIC_CREDENTIAL_TYPE_NONE;
     CredConfig.Flags = QUIC_CREDENTIAL_FLAG_CLIENT;
+
     if (!secure) {
         CredConfig.Flags |= QUIC_CREDENTIAL_FLAG_NO_CERTIFICATE_VALIDATION;
     }
 
-    //
-    // Allocate/initialize the configuration object, with the configured ALPN
-    // and settings.
-    //
-    QUIC_STATUS Status = QUIC_STATUS_SUCCESS;
-    if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(Registration, &Alpn, 1, &Settings, sizeof(Settings), NULL, &Configuration))) {
-        printf("ConfigurationOpen failed, 0x%x!\n", Status);
+    QUIC_STATUS Status;
+
+    if (QUIC_FAILED(Status = MsQuic->ConfigurationOpen(
+            Registration,
+            &Alpn,
+            1,
+            &Settings,
+            sizeof(Settings),
+            NULL,
+            &Configuration))) {
+
+        printf("ConfigurationOpen failed, 0x%x\n", Status);
         return FALSE;
     }
 
-    //
-    // Loads the TLS credential part of the configuration. This is required even
-    // on client side, to indicate if a certificate is required or not.
-    //
-    if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(Configuration, &CredConfig))) {
-        printf("ConfigurationLoadCredential failed, 0x%x!\n", Status);
+    if (QUIC_FAILED(Status = MsQuic->ConfigurationLoadCredential(
+            Configuration,
+            &CredConfig))) {
+
+        printf("ConfigurationLoadCredential failed, 0x%x\n", Status);
         return FALSE;
     }
 

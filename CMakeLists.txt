@@ -92,7 +92,7 @@ gvirtus_install_target(gvirtus-communicators-tcp)
 
 ## Quic COMMUNICATOR
 add_library(gvirtus-communicators-quic SHARED
-    src/communicators/quic/QuicCommunicator_settings.cpp)
+    src/communicators/quic/QuicCommunicator_new.cpp)
 target_link_libraries(gvirtus-communicators-quic gvirtus-communicators ${LIBMSQUIC})
 gvirtus_install_target(gvirtus-communicators-quic)
 
