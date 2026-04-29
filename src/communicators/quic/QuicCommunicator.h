@@ -250,6 +250,7 @@ class QuicCommunicator : public Communicator {
     //mutable std::atomic<bool> StreamEventOccurred(false);
     mutable std::condition_variable StreamStartCv;
 
+    bool LoadQuicSettingsFromJson(QUIC_SETTINGS& Settings);
 
 
     HQUIC Connection = nullptr;
