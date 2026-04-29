@@ -229,7 +229,7 @@ class QuicCommunicator : public Communicator {
 
     
 
-    std::string to_string() override { return "quiccommunicator"; }
+    std::string to_string() override { return "quic_communicator"; }
  private:
 
      int write_all_nonblocking(int fd, const void *buf, ssize_t len, int timeout_ms);

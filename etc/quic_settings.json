@@ -1,16 +1,16 @@
 {
   "quic_settings": {
-    "IdleTimeoutMs": 30000,
+    "IdleTimeoutMs": 5000,
     "IsSet_IdleTimeoutMs": true,
 
-    "HandshakeIdleTimeoutMs": 10000,
+    "HandshakeIdleTimeoutMs": 2000,
     "IsSet_HandshakeIdleTimeoutMs": true,
 
-    "DisconnectTimeoutMs": 30000,
+    "DisconnectTimeoutMs": 5000,
     "IsSet_DisconnectTimeoutMs": true,
 
-    "KeepAliveIntervalMs": 5000,
-    "IsSet_KeepAliveIntervalMs": true,
+    "KeepAliveIntervalMs": 0,
+    "IsSet_KeepAliveIntervalMs": false,
 
     "PeerBidiStreamCount": 65535,
     "IsSet_PeerBidiStreamCount": true,
@@ -24,7 +24,7 @@
     "ServerResumptionLevel": "QUIC_SERVER_RESUME_AND_ZERORTT",
     "IsSet_ServerResumptionLevel": true,
 
-    "InitialWindowPackets": 10,
+    "InitialWindowPackets": 200,
     "IsSet_InitialWindowPackets": true,
 
     "SendBufferingEnabled": 0,
@@ -39,31 +39,31 @@
     "DatagramReceiveEnabled": 1,
     "IsSet_DatagramReceiveEnabled": true,
 
-    "MaxAckDelayMs": 25,
+    "MaxAckDelayMs": 1,
     "IsSet_MaxAckDelayMs": true,
 
-    "StreamRecvWindowDefault": 65536,
+    "StreamRecvWindowDefault": 33554432,
     "IsSet_StreamRecvWindowDefault": true,
 
     "StreamRecvBufferDefault": 0,
     "IsSet_StreamRecvBufferDefault": false,
 
-    "ConnFlowControlWindow": 65536,
+    "ConnFlowControlWindow": 67108864,
     "IsSet_ConnFlowControlWindow": true,
 
-    "MaxWorkerQueueDelayUs": 250,
+    "MaxWorkerQueueDelayUs": 50,
     "IsSet_MaxWorkerQueueDelayUs": true,
 
     "MaxStatelessOperations": 0,
     "IsSet_MaxStatelessOperations": false,
 
-    "InitialRttMs": 100,
+    "InitialRttMs": 1,
     "IsSet_InitialRttMs": true,
 
     "MaximumMtu": 1500,
     "IsSet_MaximumMtu": true,
 
-    "MinimumMtu": 1200,
+    "MinimumMtu": 1500,
     "IsSet_MinimumMtu": true,
 
     "EcnEnabled": 1,
