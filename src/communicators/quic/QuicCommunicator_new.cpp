@@ -197,7 +197,7 @@ const gvirtus::communicators::Communicator *const QuicCommunicator::Accept() con
     newQuicCommunicator->MsQuic->SetParam(newQuicCommunicator->Connection, QUIC_PARAM_CONN_LOCAL_UNIDI_STREAM_COUNT, sizeof(int), &stream_count);
     receivedConnection = NULL;
     connectionEventOcurred = false;
-
+    std::cout << "New connection accepted and configured, returning communicator..." << std::endl;
     // TODO: maybe this communicator shoudl be saved to a list of communicators so that in async the server can handle multiple reads
     return newQuicCommunicator; //new 
 }
@@ -475,8 +475,8 @@ QUIC_STATUS QuicCommunicator::ServerListenerCallback(HQUIC Listener, void* Conte
                 cv.notify_one();
             }
 
-            usleep(20); // TODO: this should be replaced by a condition variable that waits for the connection event to be processed before accepting new connections, otherwise
-
+            usleep(100); // TODO: this should be replaced by a condition variable that waits for the connection event to be processed before accepting new connections, otherwise
+            std::cout << "Notified connection event, waiting for it to be processed before accepting new connections..." << std::endl;
             return QUIC_STATUS_SUCCESS;
 
         case QUIC_LISTENER_EVENT_STOP_COMPLETE:
@@ -653,7 +653,7 @@ QUIC_STATUS QuicCommunicator::ClientConnectionCallback(HQUIC Connection, void* C
                 connectionEventOcurred = true;
                 cv.notify_one();
             }
-            usleep(10); // TODO: this should be replaced by a condition variable that waits
+            usleep(100); // TODO: this should be replaced by a condition variable that waits
             break;
 
         case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
@@ -759,9 +759,10 @@ size_t QuicCommunicator::Read(char *buffer, size_t size) {
     // TODO: REVIEW THIS FUNCTION
     ssize_t ret_value=0;
     ssize_t size_left=size;
-
-    std::unique_lock<std::mutex> lock(listenerMutex);
-    cv.wait(lock, [this] { return multiStreams.find(DefaultStream) != multiStreams.end(); });
+    if (DefaultStream == nullptr) {
+        std::unique_lock<std::mutex> lock(listenerMutex);
+        cv.wait(lock, [this] { return multiStreams.find(DefaultStream) != multiStreams.end(); });
+    } 
     // std::cout << "Pipe for DefaultStream is ready, proceeding with read" << std::endl;
 
     while(size_left>0) {
