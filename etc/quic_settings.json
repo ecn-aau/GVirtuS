@@ -1,75 +1,75 @@
 {
   "quic_settings": {
     "IdleTimeoutMs": 30000,
-    "IsSet_IdleTimeoutMs": true,
+    "IsSet_IdleTimeoutMs": false,
 
     "HandshakeIdleTimeoutMs": 10000,
-    "IsSet_HandshakeIdleTimeoutMs": true,
+    "IsSet_HandshakeIdleTimeoutMs": false,
 
-    "DisconnectTimeoutMs": 30000,
-    "IsSet_DisconnectTimeoutMs": true,
+    "DisconnectTimeoutMs": 16000,
+    "IsSet_DisconnectTimeoutMs": false,
 
-    "KeepAliveIntervalMs": 5000,
-    "IsSet_KeepAliveIntervalMs": true,
+    "KeepAliveIntervalMs": 0,
+    "IsSet_KeepAliveIntervalMs": false,
 
-    "PeerBidiStreamCount": 65535,
-    "IsSet_PeerBidiStreamCount": true,
+    "PeerBidiStreamCount": 0,
+    "IsSet_PeerBidiStreamCount": false,
 
-    "PeerUnidiStreamCount": 65535,
-    "IsSet_PeerUnidiStreamCount": true,
+    "PeerUnidiStreamCount": 0,
+    "IsSet_PeerUnidiStreamCount": false,
 
-    "MaxBytesPerKey": 0,
+    "MaxBytesPerKey": 274877906944,
     "IsSet_MaxBytesPerKey": false,
 
-    "ServerResumptionLevel": "QUIC_SERVER_RESUME_AND_ZERORTT",
-    "IsSet_ServerResumptionLevel": true,
+    "ServerResumptionLevel": "QUIC_SERVER_NO_RESUME",
+    "IsSet_ServerResumptionLevel": false,
 
     "InitialWindowPackets": 10,
-    "IsSet_InitialWindowPackets": true,
+    "IsSet_InitialWindowPackets": false,
 
-    "SendBufferingEnabled": 0,
-    "IsSet_SendBufferingEnabled": true,
+    "SendBufferingEnabled": 1,
+    "IsSet_SendBufferingEnabled": false,
 
-    "PacingEnabled": 0,
-    "IsSet_PacingEnabled": true,
+    "PacingEnabled": 1,
+    "IsSet_PacingEnabled": false,
 
-    "MigrationEnabled": 0,
-    "IsSet_MigrationEnabled": true,
+    "MigrationEnabled": 1,
+    "IsSet_MigrationEnabled": false,
 
-    "DatagramReceiveEnabled": 1,
-    "IsSet_DatagramReceiveEnabled": true,
+    "DatagramReceiveEnabled": 0,
+    "IsSet_DatagramReceiveEnabled": false,
 
     "MaxAckDelayMs": 25,
-    "IsSet_MaxAckDelayMs": true,
+    "IsSet_MaxAckDelayMs": false,
 
     "StreamRecvWindowDefault": 65536,
-    "IsSet_StreamRecvWindowDefault": true,
+    "IsSet_StreamRecvWindowDefault": false,
 
-    "StreamRecvBufferDefault": 0,
+    "StreamRecvBufferDefault": 4096,
     "IsSet_StreamRecvBufferDefault": false,
 
-    "ConnFlowControlWindow": 65536,
-    "IsSet_ConnFlowControlWindow": true,
+    "ConnFlowControlWindow": 16777216,
+    "IsSet_ConnFlowControlWindow": false,
 
-    "MaxWorkerQueueDelayUs": 250,
-    "IsSet_MaxWorkerQueueDelayUs": true,
+    "MaxWorkerQueueDelayUs": 250000,
+    "IsSet_MaxWorkerQueueDelayUs": false,
 
-    "MaxStatelessOperations": 0,
+    "MaxStatelessOperations": 16,
     "IsSet_MaxStatelessOperations": false,
 
-    "InitialRttMs": 100,
-    "IsSet_InitialRttMs": true,
+    "InitialRttMs": 333,
+    "IsSet_InitialRttMs": false,
 
     "MaximumMtu": 1500,
-    "IsSet_MaximumMtu": true,
+    "IsSet_MaximumMtu": false,
 
-    "MinimumMtu": 1200,
-    "IsSet_MinimumMtu": true,
+    "MinimumMtu": 1288,
+    "IsSet_MinimumMtu": false,
 
-    "EcnEnabled": 1,
-    "IsSet_EcnEnabled": true,
+    "EcnEnabled": 0,
+    "IsSet_EcnEnabled": false,
 
     "HyStartEnabled": 0,
-    "IsSet_HyStartEnabled": true
+    "IsSet_HyStartEnabled": false
   }
 }
