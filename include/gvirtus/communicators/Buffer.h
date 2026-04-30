@@ -296,6 +296,7 @@ class Buffer {
     const char *const GetBuffer() const;
     size_t GetBufferSize() const;
     void Dump(Communicator *c) const;
+    void Dump_Async(Communicator *c, void* stream) const;
 
    private:
     size_t mBlockSize;

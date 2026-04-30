@@ -324,6 +324,92 @@ void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
               << " in " << server_exec_sec << " second(s)\n";
 }
 
+void Frontend::Execute_Async(const char *routine, const Buffer *input_buffer, void* stream) {
+    // For now, we can just call the synchronous version as a placeholder.
+    // In a real implementation, this would involve more complex logic to handle
+    // asynchronous execution and CUDA stream management.
+    if (input_buffer == nullptr) input_buffer = mpInputBuffer.get();
+
+    pid_t tid = syscall(SYS_gettid);
+    pid_t pid = getpid();
+    size_t in_size = input_buffer->GetBufferSize();
+    int exit_code = 0;
+    double server_exec_sec = 0.0;
+    double send_sec = 0.0;
+    double recv_sec = 0.0;
+
+    Frontend *frontend = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(gFrontendMutex);
+        auto it = mpFrontends->find(tid);
+        if (it == mpFrontends->end()) {
+            LOG4CPLUS_ERROR(logger, "Cannot send any job request");
+            return;
+        }
+        frontend = it->second;
+    }
+
+    if (frontend->_communicator->obj_ptr()->to_string() != "quiccommunicator") {
+        Execute(routine, input_buffer);
+        return;
+    }
+
+    // TODO: review, in async this might cause inconsistencies
+    frontend->mRoutinesExecuted++;
+
+    
+    // ===== send routine info first =====
+    auto start_send = steady_clock::now();
+    frontend->_communicator->obj_ptr()->Write_Async(routine, strlen(routine) + 1, stream);
+
+    // TODO: review, in async this might cause inconsistencies
+    frontend->mDataSent += in_size;
+
+    input_buffer->Dump_Async(frontend->_communicator->obj_ptr().get(), stream);
+
+
+    send_sec = duration_cast<milliseconds>(steady_clock::now() - start_send).count() / 1000.0;
+
+    frontend->mpOutputBuffer->Reset();
+
+    // ===== receive exit_code =====
+    auto start_recv = steady_clock::now();
+    frontend->_communicator->obj_ptr()->Read_Async((char *)&exit_code, sizeof(int), stream);
+    frontend->mExitCode = exit_code;
+
+    // ===== receive backend time cost =====
+    frontend->_communicator->obj_ptr()->Read_Async(reinterpret_cast<char *>(&server_exec_sec),
+                                            sizeof(server_exec_sec), stream);
+
+    // ===== receive output buffer =====
+    size_t out_buffer_size = 0;
+    frontend->_communicator->obj_ptr()->Read_Async((char *)&out_buffer_size, sizeof(size_t), stream);
+    frontend->mDataReceived += out_buffer_size;
+
+    // THIS SHOULD BE ASYNC SOMEHOW, maybe through callbacks
+    if (out_buffer_size > 0) {
+        frontend->mpOutputBuffer->Read<char>(frontend->_communicator->obj_ptr().get(),
+                                             out_buffer_size);
+    }
+
+
+    recv_sec = duration_cast<milliseconds>(steady_clock::now() - start_recv).count() / 1000.0;
+
+    // ===== update info =====
+    // TODO: review, in async this might cause inconsistencies
+    frontend->mRoutineExecutionTime += server_exec_sec;
+    frontend->mSendingTime += send_sec;
+    frontend->mReceivingTime += recv_sec;
+
+}
+
+
+void Frontend::Start_Stream(void* stream) {
+    if (this->_communicator->obj_ptr()->to_string() == "quiccommunicator") {
+        this->_communicator->obj_ptr()->Start_Stream(stream);
+    }
+}
+
 void Frontend::Prepare() {
     pid_t tid = syscall(SYS_gettid);
     {

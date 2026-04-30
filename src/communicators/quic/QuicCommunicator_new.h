@@ -32,19 +32,28 @@ struct Pipes {
     int write;
 };
 
+using cuda_stream_ptr = void*; // Placeholder for actual CUDA stream type
 class QuicCommunicator : public gvirtus::communicators::Communicator {
 public:
     QuicCommunicator(const QuicCommunicator &);
     QuicCommunicator(const std::string &communicator);
-
     virtual ~QuicCommunicator();
+
     void Serve();
     const Communicator *const Accept() const;
     void Connect();
+    
     size_t Read(char *buffer, size_t size);
+    size_t Read_Async(char * buffer, size_t size, cuda_stream_ptr stream);
+    
     size_t Write(const char *buffer, size_t size);
+    size_t Write_Async(const char * buffer, size_t size, cuda_stream_ptr stream);
+
+    void Start_Stream(cuda_stream_ptr stream);
+    
     void Sync();
     void Close();
+    
     std::string to_string() override { return "quiccommunicator"; }
 
     // Callbacks - Must be public due to Wrapper calling object callbacks
@@ -91,7 +100,12 @@ private:
 
     // map of streams and their corresponding pipes. The key is the stream id, which is a 62 bit unsigned integer.
     std::map<HQUIC, Pipes> multiStreams;
+    std::map<HQUIC, bool> streamStarted;
     std::mutex multiStreamMutex;
+
+    // map of cudaStreams to quicStreams
+    std::map<cuda_stream_ptr, HQUIC> cudaStreamMap;
+    std::mutex cudaStreamMapMutex; // maybe this should be a 
 
     std::string mHostname;
     uint16_t mPort;

@@ -131,3 +131,10 @@ void Buffer::Dump(Communicator *c) const {
      *
      */
 }
+
+void Buffer::Dump_Async(Communicator *c, void* stream) const {
+
+    c->Write_Async((char *)&mLength, sizeof(size_t), stream);
+    c->Write_Async(mpBuffer, mLength, stream);
+
+}

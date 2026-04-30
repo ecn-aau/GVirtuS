@@ -55,6 +55,18 @@ class CudaRtFrontend {
         }
     }
 
+    static inline void Execute_Async(const char* routine, const Buffer* input_buffer = NULL, void* stream = nullptr) {
+        try {
+            gvirtus::frontend::Frontend::GetFrontend()->Execute_Async(routine, input_buffer, stream);
+        } catch (const std::exception& e) {
+            cerr << "Execution exception: " << e.what() << endl;
+        }
+    }
+
+    static inline void Start_Stream(void* stream) {
+        gvirtus::frontend::Frontend::GetFrontend()->Start_Stream(stream);
+    }
+
     /**
      * Prepares the Frontend for the execution. This method _must_ be called
      * before any requests of execution or any method for adding parameters for

@@ -85,6 +85,8 @@ class Frontend {
      * @param input_buffer the buffer containing the parameters of the routine.
      */
     void Execute(const char *routine, const communicators::Buffer *input_buffer = NULL);
+    void Execute_Async(const char *routine, const communicators::Buffer *input_buffer = NULL, void* stream = nullptr);
+    void Start_Stream(void* stream);
 
     /**
      * Prepares the Frontend for the execution. This method _must_ be called

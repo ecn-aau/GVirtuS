@@ -33,8 +33,10 @@ using namespace std;
 extern "C" __host__ cudaError_t CUDARTAPI cudaStreamCreate(cudaStream_t* pStream) {
     CudaRtFrontend::Prepare();
     CudaRtFrontend::Execute("cudaStreamCreate");
-    if (CudaRtFrontend::Success())
+    if (CudaRtFrontend::Success()) {
         *pStream = (cudaStream_t)CudaRtFrontend::GetOutputDevicePointer();
+        CudaRtFrontend::Start_Stream(*pStream);
+    }
     return CudaRtFrontend::GetExitCode();
 }
 
