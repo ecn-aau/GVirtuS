@@ -25,13 +25,13 @@
     "ServerResumptionLevel": "QUIC_SERVER_RESUME_AND_ZERORTT",
     "IsSet_ServerResumptionLevel": true,
 
-    "InitialWindowPackets": 800,
+    "InitialWindowPackets": 1000,
     "IsSet_InitialWindowPackets": true,
 
     "SendBufferingEnabled": 1,
     "IsSet_SendBufferingEnabled": true,
 
-    "PacingEnabled": 0,
+    "PacingEnabled": 1,
     "IsSet_PacingEnabled": true,
 
     "MigrationEnabled": 0,
@@ -40,7 +40,7 @@
     "DatagramReceiveEnabled": 0,
     "IsSet_DatagramReceiveEnabled": true,
 
-    "MaxAckDelayMs": 5,
+    "MaxAckDelayMs": 1,
     "IsSet_MaxAckDelayMs": true,
 
     "StreamRecvWindowDefault": 8388608,
@@ -52,7 +52,7 @@
     "ConnFlowControlWindow": 8388608,
     "IsSet_ConnFlowControlWindow": true,
 
-    "MaxWorkerQueueDelayUs": 0,
+    "MaxWorkerQueueDelayUs": 500,
     "IsSet_MaxWorkerQueueDelayUs": true,
 
     "MaxStatelessOperations": 0,
@@ -94,13 +94,14 @@
     "StatelessOperationExpirationMs": 100,
     "IsSet_StatelessOperationExpirationMs": false,
 
-    "MaxOperationsPerDrain": 256,
+    "MaxOperationsPerDrain": 64,
     "IsSet_MaxOperationsPerDrain": true,
 
     "MtuDiscoveryMissingProbeCount": 3,
     "IsSet_MtuDiscoveryMissingProbeCount": false,
 
     "DestCidUpdateIdleTimeoutMs": 20000,
+
     "IsSet_DestCidUpdateIdleTimeoutMs": false,
 
     "GreaseQuicBitEnabled": 0,
@@ -111,10 +112,9 @@
 
     "StreamRecvWindowBidiRemoteDefault": 8388608,
     "IsSet_StreamRecvWindowBidiRemoteDefault": true,
-
     "StreamRecvWindowUnidiDefault": 8388608,
-    "IsSet_StreamRecvWindowUnidiDefault": true,
 
+    "IsSet_StreamRecvWindowUnidiDefault": true,
     "EncryptionOffloadAllowed": 1,
     "IsSet_EncryptionOffloadAllowed": true,
 
@@ -135,7 +135,7 @@
 
     "QTIPEnabled": 0,
     "IsSet_QTIPEnabled": false,
-
+    
     "RioEnabled": 0,
     "IsSet_RioEnabled": false
   }
