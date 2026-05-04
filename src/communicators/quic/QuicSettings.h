@@ -58,11 +58,6 @@ struct QuicSettingsConfig {
         s.IsSet.MaxStatelessOperations      = IsSet_MaxStatelessOperations;
         s.InitialRttMs                      = InitialRttMs;
         s.IsSet.InitialRttMs                = IsSet_InitialRttMs;
-
-        // not included in current version of msQuic
-        //s.MaxUdpPayloadSize                 = MaxUdpPayloadSize;
-        //s.IsSet.MaxUdpPayloadSize           = IsSet_MaxUdpPayloadSize;
-        
         s.MaximumMtu                        = MaximumMtu;
         s.IsSet.MaximumMtu                  = IsSet_MaximumMtu;
         s.MinimumMtu                        = MinimumMtu;
@@ -71,6 +66,34 @@ struct QuicSettingsConfig {
         s.IsSet.EcnEnabled                  = IsSet_EcnEnabled;
         s.HyStartEnabled                    = HyStartEnabled;
         s.IsSet.HyStartEnabled              = IsSet_HyStartEnabled;
+        s.MtuDiscoverySearchCompleteTimeoutUs    = MtuDiscoverySearchCompleteTimeoutUs;
+        s.IsSet.MtuDiscoverySearchCompleteTimeoutUs = IsSet_MtuDiscoverySearchCompleteTimeoutUs;
+        s.TlsClientMaxSendBuffer            = TlsClientMaxSendBuffer;
+        s.IsSet.TlsClientMaxSendBuffer      = IsSet_TlsClientMaxSendBuffer;
+        s.TlsServerMaxSendBuffer            = TlsServerMaxSendBuffer;
+        s.IsSet.TlsServerMaxSendBuffer      = IsSet_TlsServerMaxSendBuffer;
+        s.SendIdleTimeoutMs                 = SendIdleTimeoutMs;
+        s.IsSet.SendIdleTimeoutMs           = IsSet_SendIdleTimeoutMs;
+        s.CongestionControlAlgorithm        = CongestionControlAlgorithm;
+        s.IsSet.CongestionControlAlgorithm  = IsSet_CongestionControlAlgorithm;
+        s.MaxBindingStatelessOperations     = MaxBindingStatelessOperations;
+        s.IsSet.MaxBindingStatelessOperations = IsSet_MaxBindingStatelessOperations;
+        s.StatelessOperationExpirationMs    = StatelessOperationExpirationMs;
+        s.IsSet.StatelessOperationExpirationMs = IsSet_StatelessOperationExpirationMs;
+        s.MaxOperationsPerDrain             = MaxOperationsPerDrain;
+        s.IsSet.MaxOperationsPerDrain       = IsSet_MaxOperationsPerDrain;
+        s.MtuDiscoveryMissingProbeCount     = MtuDiscoveryMissingProbeCount;
+        s.IsSet.MtuDiscoveryMissingProbeCount = IsSet_MtuDiscoveryMissingProbeCount;
+        s.DestCidUpdateIdleTimeoutMs        = DestCidUpdateIdleTimeoutMs;
+        s.IsSet.DestCidUpdateIdleTimeoutMs  = IsSet_DestCidUpdateIdleTimeoutMs;
+        s.GreaseQuicBitEnabled              = GreaseQuicBitEnabled;
+        s.IsSet.GreaseQuicBitEnabled        = IsSet_GreaseQuicBitEnabled;
+        s.StreamRecvWindowBidiLocalDefault  = StreamRecvWindowBidiLocalDefault;
+        s.IsSet.StreamRecvWindowBidiLocalDefault  = IsSet_StreamRecvWindowBidiLocalDefault;
+        s.StreamRecvWindowBidiRemoteDefault = StreamRecvWindowBidiRemoteDefault;
+        s.IsSet.StreamRecvWindowBidiRemoteDefault = IsSet_StreamRecvWindowBidiRemoteDefault;
+        s.StreamRecvWindowUnidiDefault      = StreamRecvWindowUnidiDefault;
+        s.IsSet.StreamRecvWindowUnidiDefault = IsSet_StreamRecvWindowUnidiDefault;
 
         return s;
     }
@@ -96,11 +119,24 @@ struct QuicSettingsConfig {
     uint64_t    MaxWorkerQueueDelayUs       = 0;    bool IsSet_MaxWorkerQueueDelayUs       = false;
     uint32_t    MaxStatelessOperations      = 0;    bool IsSet_MaxStatelessOperations      = false;
     uint32_t    InitialRttMs                = 0;    bool IsSet_InitialRttMs                = false;
-    uint16_t    MaxUdpPayloadSize           = 0;    bool IsSet_MaxUdpPayloadSize           = false;
     uint16_t    MaximumMtu                  = 0;    bool IsSet_MaximumMtu                  = false;
     uint16_t    MinimumMtu                  = 0;    bool IsSet_MinimumMtu                  = false;
     uint8_t     EcnEnabled                  = 0;    bool IsSet_EcnEnabled                  = false;
     uint8_t     HyStartEnabled              = 0;    bool IsSet_HyStartEnabled              = false;
+    uint64_t    MtuDiscoverySearchCompleteTimeoutUs = 0; bool IsSet_MtuDiscoverySearchCompleteTimeoutUs = false;
+    uint32_t    TlsClientMaxSendBuffer      = 0;    bool IsSet_TlsClientMaxSendBuffer      = false;
+    uint32_t    TlsServerMaxSendBuffer      = 0;    bool IsSet_TlsServerMaxSendBuffer      = false;
+    uint32_t    SendIdleTimeoutMs           = 0;    bool IsSet_SendIdleTimeoutMs           = false;
+    uint16_t    CongestionControlAlgorithm  = 0;    bool IsSet_CongestionControlAlgorithm  = false;
+    uint16_t    MaxBindingStatelessOperations = 0;  bool IsSet_MaxBindingStatelessOperations = false;
+    uint16_t    StatelessOperationExpirationMs = 0; bool IsSet_StatelessOperationExpirationMs = false;
+    uint8_t     MaxOperationsPerDrain       = 0;    bool IsSet_MaxOperationsPerDrain       = false;
+    uint8_t     MtuDiscoveryMissingProbeCount = 0;  bool IsSet_MtuDiscoveryMissingProbeCount = false;
+    uint32_t    DestCidUpdateIdleTimeoutMs  = 0;    bool IsSet_DestCidUpdateIdleTimeoutMs  = false;
+    uint8_t     GreaseQuicBitEnabled        = 0;    bool IsSet_GreaseQuicBitEnabled        = false;
+    uint32_t    StreamRecvWindowBidiLocalDefault  = 0; bool IsSet_StreamRecvWindowBidiLocalDefault  = false;
+    uint32_t    StreamRecvWindowBidiRemoteDefault = 0; bool IsSet_StreamRecvWindowBidiRemoteDefault = false;
+    uint32_t    StreamRecvWindowUnidiDefault = 0;  bool IsSet_StreamRecvWindowUnidiDefault = false;
 };
 
 inline void from_json(const nlohmann::json& j, QuicSettingsConfig& s) {
@@ -150,8 +186,6 @@ inline void from_json(const nlohmann::json& j, QuicSettingsConfig& s) {
     get("IsSet_MaxStatelessOperations", s.IsSet_MaxStatelessOperations);
     get("InitialRttMs",                 s.InitialRttMs);
     get("IsSet_InitialRttMs",           s.IsSet_InitialRttMs);
-    get("MaxUdpPayloadSize",            s.MaxUdpPayloadSize);
-    get("IsSet_MaxUdpPayloadSize",      s.IsSet_MaxUdpPayloadSize);
     get("MaximumMtu",                   s.MaximumMtu);
     get("IsSet_MaximumMtu",             s.IsSet_MaximumMtu);
     get("MinimumMtu",                   s.MinimumMtu);
@@ -160,4 +194,32 @@ inline void from_json(const nlohmann::json& j, QuicSettingsConfig& s) {
     get("IsSet_EcnEnabled",             s.IsSet_EcnEnabled);
     get("HyStartEnabled",               s.HyStartEnabled);
     get("IsSet_HyStartEnabled",         s.IsSet_HyStartEnabled);
+    get("MtuDiscoverySearchCompleteTimeoutUs",    s.MtuDiscoverySearchCompleteTimeoutUs);
+    get("IsSet_MtuDiscoverySearchCompleteTimeoutUs", s.IsSet_MtuDiscoverySearchCompleteTimeoutUs);
+    get("TlsClientMaxSendBuffer",       s.TlsClientMaxSendBuffer);
+    get("IsSet_TlsClientMaxSendBuffer", s.IsSet_TlsClientMaxSendBuffer);
+    get("TlsServerMaxSendBuffer",       s.TlsServerMaxSendBuffer);
+    get("IsSet_TlsServerMaxSendBuffer", s.IsSet_TlsServerMaxSendBuffer);
+    get("SendIdleTimeoutMs",            s.SendIdleTimeoutMs);
+    get("IsSet_SendIdleTimeoutMs",      s.IsSet_SendIdleTimeoutMs);
+    get("CongestionControlAlgorithm",   s.CongestionControlAlgorithm);
+    get("IsSet_CongestionControlAlgorithm", s.IsSet_CongestionControlAlgorithm);
+    get("MaxBindingStatelessOperations", s.MaxBindingStatelessOperations);
+    get("IsSet_MaxBindingStatelessOperations", s.IsSet_MaxBindingStatelessOperations);
+    get("StatelessOperationExpirationMs", s.StatelessOperationExpirationMs);
+    get("IsSet_StatelessOperationExpirationMs", s.IsSet_StatelessOperationExpirationMs);
+    get("MaxOperationsPerDrain",        s.MaxOperationsPerDrain);
+    get("IsSet_MaxOperationsPerDrain",  s.IsSet_MaxOperationsPerDrain);
+    get("MtuDiscoveryMissingProbeCount", s.MtuDiscoveryMissingProbeCount);
+    get("IsSet_MtuDiscoveryMissingProbeCount", s.IsSet_MtuDiscoveryMissingProbeCount);
+    get("DestCidUpdateIdleTimeoutMs",   s.DestCidUpdateIdleTimeoutMs);
+    get("IsSet_DestCidUpdateIdleTimeoutMs", s.IsSet_DestCidUpdateIdleTimeoutMs);
+    get("GreaseQuicBitEnabled",         s.GreaseQuicBitEnabled);
+    get("IsSet_GreaseQuicBitEnabled",   s.IsSet_GreaseQuicBitEnabled);
+    get("StreamRecvWindowBidiLocalDefault",  s.StreamRecvWindowBidiLocalDefault);
+    get("IsSet_StreamRecvWindowBidiLocalDefault",  s.IsSet_StreamRecvWindowBidiLocalDefault);
+    get("StreamRecvWindowBidiRemoteDefault", s.StreamRecvWindowBidiRemoteDefault);
+    get("IsSet_StreamRecvWindowBidiRemoteDefault", s.IsSet_StreamRecvWindowBidiRemoteDefault);
+    get("StreamRecvWindowUnidiDefault", s.StreamRecvWindowUnidiDefault);
+    get("IsSet_StreamRecvWindowUnidiDefault", s.IsSet_StreamRecvWindowUnidiDefault);
 }
