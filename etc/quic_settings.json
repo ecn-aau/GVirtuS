@@ -25,13 +25,13 @@
     "ServerResumptionLevel": "QUIC_SERVER_RESUME_AND_ZERORTT",
     "IsSet_ServerResumptionLevel": true,
 
-    "InitialWindowPackets": 100,
+    "InitialWindowPackets": 2000,
     "IsSet_InitialWindowPackets": true,
 
     "SendBufferingEnabled": 1,
     "IsSet_SendBufferingEnabled": true,
 
-    "PacingEnabled": 1,
+    "PacingEnabled": 0,
     "IsSet_PacingEnabled": true,
 
     "MigrationEnabled": 0,
@@ -40,52 +40,52 @@
     "DatagramReceiveEnabled": 0,
     "IsSet_DatagramReceiveEnabled": true,
 
-    "MaxAckDelayMs": 10,
+    "MaxAckDelayMs": 0,
     "IsSet_MaxAckDelayMs": true,
 
-    "StreamRecvWindowDefault": 67108864,
+    "StreamRecvWindowDefault": 134217728,
     "IsSet_StreamRecvWindowDefault": true,
 
-    "StreamRecvBufferDefault": 1048576,
+    "StreamRecvBufferDefault": 8388608,
     "IsSet_StreamRecvBufferDefault": true,
 
-    "ConnFlowControlWindow": 536870912,
+    "ConnFlowControlWindow": 1073741824,
     "IsSet_ConnFlowControlWindow": true,
 
-    "MaxWorkerQueueDelayUs": 1500,
+    "MaxWorkerQueueDelayUs": 0,
     "IsSet_MaxWorkerQueueDelayUs": true,
 
     "MaxStatelessOperations": 0,
     "IsSet_MaxStatelessOperations": false,
 
-    "InitialRttMs": 20,
+    "InitialRttMs": 1,
     "IsSet_InitialRttMs": true,
 
     "MaximumMtu": 9000,
     "IsSet_MaximumMtu": true,
 
-    "MinimumMtu": 1280,
+    "MinimumMtu": 1500,
     "IsSet_MinimumMtu": true,
 
     "EcnEnabled": 1,
     "IsSet_EcnEnabled": true,
 
-    "HyStartEnabled": 1,
+    "HyStartEnabled": 0,
     "IsSet_HyStartEnabled": true,
 
     "MtuDiscoverySearchCompleteTimeoutUs": 600000000,
     "IsSet_MtuDiscoverySearchCompleteTimeoutUs": false,
 
-    "TlsClientMaxSendBuffer": 67108864,
+    "TlsClientMaxSendBuffer": 134217728,
     "IsSet_TlsClientMaxSendBuffer": true,
 
-    "TlsServerMaxSendBuffer": 67108864,
+    "TlsServerMaxSendBuffer": 134217728,
     "IsSet_TlsServerMaxSendBuffer": true,
 
     "SendIdleTimeoutMs": 0,
     "IsSet_SendIdleTimeoutMs": true,
 
-    "CongestionControlAlgorithm": 1,
+    "CongestionControlAlgorithm": 0,
     "IsSet_CongestionControlAlgorithm": true,
 
     "MaxBindingStatelessOperations": 100,
@@ -94,7 +94,7 @@
     "StatelessOperationExpirationMs": 100,
     "IsSet_StatelessOperationExpirationMs": false,
 
-    "MaxOperationsPerDrain": 64,
+    "MaxOperationsPerDrain": 256,
     "IsSet_MaxOperationsPerDrain": true,
 
     "MtuDiscoveryMissingProbeCount": 3,
@@ -106,13 +106,13 @@
     "GreaseQuicBitEnabled": 0,
     "IsSet_GreaseQuicBitEnabled": false,
 
-    "StreamRecvWindowBidiLocalDefault": 67108864,
+    "StreamRecvWindowBidiLocalDefault": 134217728,
     "IsSet_StreamRecvWindowBidiLocalDefault": true,
 
-    "StreamRecvWindowBidiRemoteDefault": 67108864,
+    "StreamRecvWindowBidiRemoteDefault": 134217728,
     "IsSet_StreamRecvWindowBidiRemoteDefault": true,
 
-    "StreamRecvWindowUnidiDefault": 67108864,
+    "StreamRecvWindowUnidiDefault": 134217728,
     "IsSet_StreamRecvWindowUnidiDefault": true,
 
     "EncryptionOffloadAllowed": 1,
