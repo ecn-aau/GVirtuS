@@ -43,10 +43,10 @@
     "MaxAckDelayMs": 1,
     "IsSet_MaxAckDelayMs": true,
 
-    "StreamRecvWindowDefault": 4294967296,
+    "StreamRecvWindowDefault": 2147483648,
     "IsSet_StreamRecvWindowDefault": true,
 
-    "StreamRecvBufferDefault": 4294967296,
+    "StreamRecvBufferDefault": 2147483648,
     "IsSet_StreamRecvBufferDefault": true,
 
     "ConnFlowControlWindow": 16777216,
