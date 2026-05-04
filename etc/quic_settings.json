@@ -40,7 +40,7 @@
     "DatagramReceiveEnabled": 0,
     "IsSet_DatagramReceiveEnabled": true,
 
-    "MaxAckDelayMs": 0,
+    "MaxAckDelayMs": 1,
     "IsSet_MaxAckDelayMs": true,
 
     "StreamRecvWindowDefault": 8388608,
@@ -61,7 +61,7 @@
     "InitialRttMs": 1,
     "IsSet_InitialRttMs": true,
 
-    "MaximumMtu": 9000,
+    "MaximumMtu": 1500,
     "IsSet_MaximumMtu": true,
 
     "MinimumMtu": 1500,
