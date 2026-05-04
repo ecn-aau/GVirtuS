@@ -95,9 +95,28 @@ struct QuicSettingsConfig {
         s.StreamRecvWindowUnidiDefault      = StreamRecvWindowUnidiDefault;
         s.IsSet.StreamRecvWindowUnidiDefault = IsSet_StreamRecvWindowUnidiDefault;
 
+        // --- Newly added fields ---
+        s.EncryptionOffloadAllowed          = EncryptionOffloadAllowed;
+        s.IsSet.EncryptionOffloadAllowed    = IsSet_EncryptionOffloadAllowed;
+        s.ReliableResetEnabled              = ReliableResetEnabled;
+        s.IsSet.ReliableResetEnabled        = IsSet_ReliableResetEnabled;
+        s.OneWayDelayEnabled                = OneWayDelayEnabled;
+        s.IsSet.OneWayDelayEnabled          = IsSet_OneWayDelayEnabled;
+        s.NetStatsEventEnabled              = NetStatsEventEnabled;
+        s.IsSet.NetStatsEventEnabled        = IsSet_NetStatsEventEnabled;
+        s.StreamMultiReceiveEnabled         = StreamMultiReceiveEnabled;
+        s.IsSet.StreamMultiReceiveEnabled   = IsSet_StreamMultiReceiveEnabled;
+        s.XdpEnabled                        = XdpEnabled;
+        s.IsSet.XdpEnabled                  = IsSet_XdpEnabled;
+        s.QTIPEnabled                       = QTIPEnabled;
+        s.IsSet.QTIPEnabled                 = IsSet_QTIPEnabled;
+        s.RioEnabled                        = RioEnabled;
+        s.IsSet.RioEnabled                  = IsSet_RioEnabled;
+
         return s;
     }
 
+    // --- Existing fields ---
     uint64_t    IdleTimeoutMs               = 0;    bool IsSet_IdleTimeoutMs               = false;
     uint64_t    HandshakeIdleTimeoutMs      = 0;    bool IsSet_HandshakeIdleTimeoutMs      = false;
     uint32_t    DisconnectTimeoutMs         = 0;    bool IsSet_DisconnectTimeoutMs         = false;
@@ -137,6 +156,16 @@ struct QuicSettingsConfig {
     uint32_t    StreamRecvWindowBidiLocalDefault  = 0; bool IsSet_StreamRecvWindowBidiLocalDefault  = false;
     uint32_t    StreamRecvWindowBidiRemoteDefault = 0; bool IsSet_StreamRecvWindowBidiRemoteDefault = false;
     uint32_t    StreamRecvWindowUnidiDefault = 0;  bool IsSet_StreamRecvWindowUnidiDefault = false;
+
+    // --- Newly added fields ---
+    uint8_t     EncryptionOffloadAllowed    = 0;    bool IsSet_EncryptionOffloadAllowed    = false;
+    uint8_t     ReliableResetEnabled        = 0;    bool IsSet_ReliableResetEnabled        = false;
+    uint8_t     OneWayDelayEnabled          = 0;    bool IsSet_OneWayDelayEnabled          = false;
+    uint8_t     NetStatsEventEnabled        = 0;    bool IsSet_NetStatsEventEnabled        = false;
+    uint8_t     StreamMultiReceiveEnabled   = 0;    bool IsSet_StreamMultiReceiveEnabled   = false;
+    uint8_t     XdpEnabled                  = 0;    bool IsSet_XdpEnabled                  = false;
+    uint8_t     QTIPEnabled                 = 0;    bool IsSet_QTIPEnabled                 = false;
+    uint8_t     RioEnabled                  = 0;    bool IsSet_RioEnabled                  = false;
 };
 
 inline void from_json(const nlohmann::json& j, QuicSettingsConfig& s) {
@@ -146,6 +175,7 @@ inline void from_json(const nlohmann::json& j, QuicSettingsConfig& s) {
         if (q.contains(key)) q.at(key).get_to(field);
     };
 
+    // --- Existing fields ---
     get("IdleTimeoutMs",                s.IdleTimeoutMs);
     get("IsSet_IdleTimeoutMs",          s.IsSet_IdleTimeoutMs);
     get("HandshakeIdleTimeoutMs",       s.HandshakeIdleTimeoutMs);
@@ -222,4 +252,22 @@ inline void from_json(const nlohmann::json& j, QuicSettingsConfig& s) {
     get("IsSet_StreamRecvWindowBidiRemoteDefault", s.IsSet_StreamRecvWindowBidiRemoteDefault);
     get("StreamRecvWindowUnidiDefault", s.StreamRecvWindowUnidiDefault);
     get("IsSet_StreamRecvWindowUnidiDefault", s.IsSet_StreamRecvWindowUnidiDefault);
+
+    // --- Newly added fields ---
+    get("EncryptionOffloadAllowed",     s.EncryptionOffloadAllowed);
+    get("IsSet_EncryptionOffloadAllowed", s.IsSet_EncryptionOffloadAllowed);
+    get("ReliableResetEnabled",         s.ReliableResetEnabled);
+    get("IsSet_ReliableResetEnabled",   s.IsSet_ReliableResetEnabled);
+    get("OneWayDelayEnabled",           s.OneWayDelayEnabled);
+    get("IsSet_OneWayDelayEnabled",     s.IsSet_OneWayDelayEnabled);
+    get("NetStatsEventEnabled",         s.NetStatsEventEnabled);
+    get("IsSet_NetStatsEventEnabled",   s.IsSet_NetStatsEventEnabled);
+    get("StreamMultiReceiveEnabled",    s.StreamMultiReceiveEnabled);
+    get("IsSet_StreamMultiReceiveEnabled", s.IsSet_StreamMultiReceiveEnabled);
+    get("XdpEnabled",                   s.XdpEnabled);
+    get("IsSet_XdpEnabled",             s.IsSet_XdpEnabled);
+    get("QTIPEnabled",                  s.QTIPEnabled);
+    get("IsSet_QTIPEnabled",            s.IsSet_QTIPEnabled);
+    get("RioEnabled",                   s.RioEnabled);
+    get("IsSet_RioEnabled",             s.IsSet_RioEnabled);
 }

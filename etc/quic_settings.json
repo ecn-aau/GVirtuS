@@ -112,6 +112,30 @@
     "IsSet_StreamRecvWindowBidiRemoteDefault": true,
 
     "StreamRecvWindowUnidiDefault": 8388608,
-    "IsSet_StreamRecvWindowUnidiDefault": true
+    "IsSet_StreamRecvWindowUnidiDefault": true,
+
+    "EncryptionOffloadAllowed": 0,
+    "IsSet_EncryptionOffloadAllowed": false,
+
+    "ReliableResetEnabled": 0,
+    "IsSet_ReliableResetEnabled": false,
+
+    "OneWayDelayEnabled": 0,
+    "IsSet_OneWayDelayEnabled": false,
+
+    "NetStatsEventEnabled": 0,
+    "IsSet_NetStatsEventEnabled": false,
+
+    "StreamMultiReceiveEnabled": 0,
+    "IsSet_StreamMultiReceiveEnabled": false,
+
+    "XdpEnabled": 1,
+    "IsSet_XdpEnabled": true,
+
+    "QTIPEnabled": 0,
+    "IsSet_QTIPEnabled": false,
+
+    "RioEnabled": 0,
+    "IsSet_RioEnabled": false
   }
 }
