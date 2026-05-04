@@ -49,7 +49,7 @@
     "StreamRecvBufferDefault": 8388608,
     "IsSet_StreamRecvBufferDefault": true,
 
-    "ConnFlowControlWindow": 8388608,
+    "ConnFlowControlWindow": 16777216,
     "IsSet_ConnFlowControlWindow": true,
 
     "MaxWorkerQueueDelayUs": 500,
@@ -133,8 +133,8 @@
     "XdpEnabled": 1,
     "IsSet_XdpEnabled": true,
 
-    "QTIPEnabled": 0,
-    "IsSet_QTIPEnabled": false,
+    "QTIPEnabled": 1,
+    "IsSet_QTIPEnabled": true,
     
     "RioEnabled": 0,
     "IsSet_RioEnabled": false
