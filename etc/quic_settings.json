@@ -40,7 +40,7 @@
     "DatagramReceiveEnabled": 0,
     "IsSet_DatagramReceiveEnabled": true,
 
-    "MaxAckDelayMs": 1,
+    "MaxAckDelayMs": 5,
     "IsSet_MaxAckDelayMs": true,
 
     "StreamRecvWindowDefault": 8388608,
