@@ -25,7 +25,7 @@
     "ServerResumptionLevel": "QUIC_SERVER_RESUME_AND_ZERORTT",
     "IsSet_ServerResumptionLevel": true,
 
-    "InitialWindowPackets": 1000,
+    "InitialWindowPackets": 100,
     "IsSet_InitialWindowPackets": true,
 
     "SendBufferingEnabled": 1,
@@ -40,7 +40,7 @@
     "DatagramReceiveEnabled": 0,
     "IsSet_DatagramReceiveEnabled": true,
 
-    "MaxAckDelayMs": 1,
+    "MaxAckDelayMs": 10,
     "IsSet_MaxAckDelayMs": true,
 
     "StreamRecvWindowDefault": 67108864,
@@ -52,25 +52,25 @@
     "ConnFlowControlWindow": 536870912,
     "IsSet_ConnFlowControlWindow": true,
 
-    "MaxWorkerQueueDelayUs": 500,
+    "MaxWorkerQueueDelayUs": 1500,
     "IsSet_MaxWorkerQueueDelayUs": true,
 
     "MaxStatelessOperations": 0,
     "IsSet_MaxStatelessOperations": false,
 
-    "InitialRttMs": 1,
+    "InitialRttMs": 20,
     "IsSet_InitialRttMs": true,
 
-    "MaximumMtu": 1500,
+    "MaximumMtu": 9000,
     "IsSet_MaximumMtu": true,
 
-    "MinimumMtu": 1500,
+    "MinimumMtu": 1280,
     "IsSet_MinimumMtu": true,
 
     "EcnEnabled": 1,
     "IsSet_EcnEnabled": true,
 
-    "HyStartEnabled": 0,
+    "HyStartEnabled": 1,
     "IsSet_HyStartEnabled": true,
 
     "MtuDiscoverySearchCompleteTimeoutUs": 600000000,
@@ -85,7 +85,7 @@
     "SendIdleTimeoutMs": 0,
     "IsSet_SendIdleTimeoutMs": true,
 
-    "CongestionControlAlgorithm": 0,
+    "CongestionControlAlgorithm": 1,
     "IsSet_CongestionControlAlgorithm": true,
 
     "MaxBindingStatelessOperations": 100,
