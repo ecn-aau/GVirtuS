@@ -1,12 +1,13 @@
 {
   "quic_settings": {
-    "IdleTimeoutMs": 1000,
+
+    "IdleTimeoutMs": 30000,
     "IsSet_IdleTimeoutMs": true,
 
-    "HandshakeIdleTimeoutMs": 500,
+    "HandshakeIdleTimeoutMs": 2000,
     "IsSet_HandshakeIdleTimeoutMs": true,
 
-    "DisconnectTimeoutMs": 1000,
+    "DisconnectTimeoutMs": 10000,
     "IsSet_DisconnectTimeoutMs": true,
 
     "KeepAliveIntervalMs": 0,
@@ -24,34 +25,34 @@
     "ServerResumptionLevel": "QUIC_SERVER_RESUME_AND_ZERORTT",
     "IsSet_ServerResumptionLevel": true,
 
-    "InitialWindowPackets": 1000,
+    "InitialWindowPackets": 100,
     "IsSet_InitialWindowPackets": true,
 
-    "SendBufferingEnabled": 1,
+    "SendBufferingEnabled": 0,
     "IsSet_SendBufferingEnabled": true,
 
-    "PacingEnabled": 1,
+    "PacingEnabled": 0,
     "IsSet_PacingEnabled": true,
 
     "MigrationEnabled": 0,
     "IsSet_MigrationEnabled": true,
 
-    "DatagramReceiveEnabled": 1,
+    "DatagramReceiveEnabled": 0,
     "IsSet_DatagramReceiveEnabled": true,
 
-    "MaxAckDelayMs": 1,
+    "MaxAckDelayMs": 25,
     "IsSet_MaxAckDelayMs": true,
 
-    "StreamRecvWindowDefault": 8388608,
+    "StreamRecvWindowDefault": 67108864,
     "IsSet_StreamRecvWindowDefault": true,
 
-    "StreamRecvBufferDefault": 0,
-    "IsSet_StreamRecvBufferDefault": false,
+    "StreamRecvBufferDefault": 1048576,
+    "IsSet_StreamRecvBufferDefault": true,
 
-    "ConnFlowControlWindow": 67108864,
+    "ConnFlowControlWindow": 536870912,
     "IsSet_ConnFlowControlWindow": true,
 
-    "MaxWorkerQueueDelayUs": 100,
+    "MaxWorkerQueueDelayUs": 1000,
     "IsSet_MaxWorkerQueueDelayUs": true,
 
     "MaxStatelessOperations": 0,
@@ -75,17 +76,17 @@
     "MtuDiscoverySearchCompleteTimeoutUs": 600000000,
     "IsSet_MtuDiscoverySearchCompleteTimeoutUs": false,
 
-    "TlsClientMaxSendBuffer": 4194304,
-    "IsSet_TlsClientMaxSendBuffer": false,
+    "TlsClientMaxSendBuffer": 67108864,
+    "IsSet_TlsClientMaxSendBuffer": true,
 
-    "TlsServerMaxSendBuffer": 8192,
-    "IsSet_TlsServerMaxSendBuffer": false,
+    "TlsServerMaxSendBuffer": 67108864,
+    "IsSet_TlsServerMaxSendBuffer": true,
 
-    "SendIdleTimeoutMs": 1000,
-    "IsSet_SendIdleTimeoutMs": false,
+    "SendIdleTimeoutMs": 0,
+    "IsSet_SendIdleTimeoutMs": true,
 
-    "CongestionControlAlgorithm": 0,
-    "IsSet_CongestionControlAlgorithm": false,
+    "CongestionControlAlgorithm": 1,
+    "IsSet_CongestionControlAlgorithm": true,
 
     "MaxBindingStatelessOperations": 100,
     "IsSet_MaxBindingStatelessOperations": false,
@@ -93,8 +94,8 @@
     "StatelessOperationExpirationMs": 100,
     "IsSet_StatelessOperationExpirationMs": false,
 
-    "MaxOperationsPerDrain": 16,
-    "IsSet_MaxOperationsPerDrain": false,
+    "MaxOperationsPerDrain": 64,
+    "IsSet_MaxOperationsPerDrain": true,
 
     "MtuDiscoveryMissingProbeCount": 3,
     "IsSet_MtuDiscoveryMissingProbeCount": false,
@@ -105,17 +106,17 @@
     "GreaseQuicBitEnabled": 0,
     "IsSet_GreaseQuicBitEnabled": false,
 
-    "StreamRecvWindowBidiLocalDefault": 8388608,
+    "StreamRecvWindowBidiLocalDefault": 67108864,
     "IsSet_StreamRecvWindowBidiLocalDefault": true,
 
-    "StreamRecvWindowBidiRemoteDefault": 8388608,
+    "StreamRecvWindowBidiRemoteDefault": 67108864,
     "IsSet_StreamRecvWindowBidiRemoteDefault": true,
 
-    "StreamRecvWindowUnidiDefault": 8388608,
+    "StreamRecvWindowUnidiDefault": 67108864,
     "IsSet_StreamRecvWindowUnidiDefault": true,
 
-    "EncryptionOffloadAllowed": 0,
-    "IsSet_EncryptionOffloadAllowed": false,
+    "EncryptionOffloadAllowed": 1,
+    "IsSet_EncryptionOffloadAllowed": true,
 
     "ReliableResetEnabled": 0,
     "IsSet_ReliableResetEnabled": false,
@@ -126,8 +127,8 @@
     "NetStatsEventEnabled": 0,
     "IsSet_NetStatsEventEnabled": false,
 
-    "StreamMultiReceiveEnabled": 0,
-    "IsSet_StreamMultiReceiveEnabled": false,
+    "StreamMultiReceiveEnabled": 1,
+    "IsSet_StreamMultiReceiveEnabled": true,
 
     "XdpEnabled": 1,
     "IsSet_XdpEnabled": true,
