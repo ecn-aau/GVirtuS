@@ -22,7 +22,7 @@ ENV GVIRTUS_HOME=/opt/GVirtuS
     
 COPY ./msquic ${GVIRTUS_HOME}/msquic
 RUN cd ${GVIRTUS_HOME}/msquic &&  \
-    cmake -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release -DQUIC_API_PREVIEW_FEATURES=ON && \
     cmake --build build && \
     cmake --install build
 
@@ -39,7 +39,8 @@ COPY ./CMakeLists.txt ${GVIRTUS_HOME}/CMakeLists.txt
 
 WORKDIR ${GVIRTUS_HOME}
 RUN cmake -B build -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} \
-    -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda-12.6/targets/x86_64-linux/lib/stubs -L/usr/local/cuda/lib64/stubs" && \
+    -DCMAKE_SHARED_LINKER_FLAGS="-L/usr/local/cuda-12.6/targets/x86_64-linux/lib/stubs -L/usr/local/cuda/lib64/stubs" \
+    -DQUIC_API_PREVIEW_FEATURES=ON && \
     cd build && \
     make -j$(nproc) && make install
 

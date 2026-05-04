@@ -122,7 +122,7 @@ struct QuicSettingsConfig {
     uint32_t    StreamRecvWindowDefault     = 0;    bool IsSet_StreamRecvWindowDefault     = false;
     uint32_t    StreamRecvBufferDefault     = 0;    bool IsSet_StreamRecvBufferDefault     = false;
     uint32_t    ConnFlowControlWindow       = 0;    bool IsSet_ConnFlowControlWindow       = false;
-    uint64_t    MaxWorkerQueueDelayUs       = 0;    bool IsSet_MaxWorkerQueueDelayUs       = false;
+    uint32_t    MaxWorkerQueueDelayUs       = 0;    bool IsSet_MaxWorkerQueueDelayUs       = false;
     uint32_t    MaxStatelessOperations      = 0;    bool IsSet_MaxStatelessOperations      = false;
     uint32_t    InitialRttMs                = 0;    bool IsSet_InitialRttMs                = false;
     uint16_t    MaximumMtu                  = 0;    bool IsSet_MaximumMtu                  = false;
