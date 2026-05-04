@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <cmath>
 #include <cuda_runtime.h>
 
 __global__ void saxpy(int n, float a, float *x, float *y) {
@@ -29,31 +30,53 @@ int main() {
         y[i] = 2.0f;
     }
 
-    // Create a CUDA stream
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
+    const int numStreams = 4;
+    cudaStream_t streams[numStreams];
+    for (int i = 0; i < numStreams; ++i) {
+        cudaStreamCreate(&streams[i]);
+    }
 
-    // Async copy host -> device
-    cudaMemcpyAsync(d_x, x, size, cudaMemcpyHostToDevice, stream);
-    cudaMemcpyAsync(d_y, y, size, cudaMemcpyHostToDevice, stream);
-
-    // Launch kernel in the same stream
     int blockSize = 256;
-    int gridSize = (N + blockSize - 1) / blockSize;
-    saxpy<<<gridSize, blockSize, 0, stream>>>(N, 2.0f, d_x, d_y);
+    int chunkSize = (N + numStreams - 1) / numStreams;
 
-    // Async copy device -> host
-    cudaMemcpyAsync(y, d_y, size, cudaMemcpyDeviceToHost, stream);
+    for (int i = 0; i < numStreams; ++i) {
+        int offset = i * chunkSize;
+        int currentN = (offset + chunkSize <= N) ? chunkSize : (N - offset);
+        if (currentN <= 0) break;
 
-    // Wait for all operations in stream to complete
-    cudaStreamSynchronize(stream);
+        size_t currentSize = currentN * sizeof(float);
+        int gridSize = (currentN + blockSize - 1) / blockSize;
 
-    // Cleanup
-    cudaStreamDestroy(stream);
+        cudaMemcpyAsync(d_x + offset, x + offset, currentSize, cudaMemcpyHostToDevice, streams[i]);
+        cudaMemcpyAsync(d_y + offset, y + offset, currentSize, cudaMemcpyHostToDevice, streams[i]);
+        saxpy<<<gridSize, blockSize, 0, streams[i]>>>(currentN, 2.0f, d_x + offset, d_y + offset);
+        cudaMemcpyAsync(y + offset, d_y + offset, currentSize, cudaMemcpyDeviceToHost, streams[i]);
+    }
+
+    for (int i = 0; i < numStreams; ++i) {
+        cudaStreamSynchronize(streams[i]);
+        cudaStreamDestroy(streams[i]);
+    }
+
+    // Verify result
+    bool valid = true;
+    for (int i = 0; i < N; ++i) {
+        float expected = 2.0f * x[i] + 2.0f;
+        if (fabsf(y[i] - expected) > 1e-5f) {
+            printf("Validation failed at index %d: y=%f expected=%f\n", i, y[i], expected);
+            valid = false;
+            break;
+        }
+    }
+
+    if (valid) {
+        printf("Result verification passed.\n");
+    }
+
     cudaFree(d_x);
     cudaFree(d_y);
     cudaFreeHost(x);
     cudaFreeHost(y);
 
-    return 0;
+    return valid ? 0 : 1;
 }

@@ -48,9 +48,10 @@ class Result {
 
     virtual ~Result() = default;
     int GetExitCode();
+    std::shared_ptr<Buffer> GetOutputBuffer() { return mpOutputBuffer; };
 
     void Dump(Communicator *c);
-
+    void Dump_Async(Communicator *c, void* stream);
     void TimeTaken(double time_taken);
     double TimeTaken() const;
 

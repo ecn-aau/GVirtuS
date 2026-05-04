@@ -568,7 +568,7 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaMemcpyAsync(void *dst, const void 
             CudaRtFrontend::AddVariableForArguments(count);
             CudaRtFrontend::AddVariableForArguments(kind);
             CudaRtFrontend::AddDevicePointerForArguments(stream);
-            CudaRtFrontend::Execute("cudaMemcpyAsync");
+            CudaRtFrontend::Execute_Async("cudaMemcpyAsync", nullptr, (void *) stream);
             break;
         case cudaMemcpyDeviceToHost:
             // cout << "cudaMemcpyAsync DeviceToHost" << endl;

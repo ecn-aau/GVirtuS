@@ -110,6 +110,22 @@ void Buffer::Reset(Communicator *c) {
     c->Read(mpBuffer, mLength);
 }
 
+void Buffer::Reset_Async(Communicator *c, void* stream) {
+    c->Read_Async((char *)&mLength, sizeof(size_t), stream);
+#ifdef DEBUG
+    cout << "Read " << mLength << " bytes from the buffer" << endl;
+#endif
+    mOffset = 0;
+    mBackOffset = mLength;
+    if (mLength >= mSize) {
+        mSize = (mLength / mBlockSize + 1) * mBlockSize;
+        if ((mpBuffer = (char *)realloc(mpBuffer, mSize)) == NULL)
+            throw runtime_error("Can't reallocate memory.");
+    }
+
+    c->Read_Async(mpBuffer, mLength, stream);
+}
+
 const char *const Buffer::GetBuffer() const { return mpBuffer; }
 
 size_t Buffer::GetBufferSize() const { return mLength; }

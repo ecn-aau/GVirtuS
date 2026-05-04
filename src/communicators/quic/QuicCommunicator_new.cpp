@@ -218,6 +218,11 @@ QuicCommunicator::QuicCommunicator(const std::string &communicator) {
 QuicCommunicator::~QuicCommunicator() {
     if (DefaultStream!=NULL)
         MsQuic->StreamClose(DefaultStream);
+        
+    for (auto& pair : cudaStreamMap) {
+        MsQuic->StreamClose(pair.second);
+        cudaStreamMap.erase(pair.first);
+    }
     if (Connection != NULL)
         MsQuic->ConnectionClose(Connection);
 
@@ -652,7 +657,7 @@ QUIC_STATUS QuicCommunicator::ServerConnectionCallback(HQUIC Connection, void* C
         std::cout << "QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED received. Stream: " << Event->PEER_STREAM_STARTED.Stream << std::endl;
         std::cout << "DefaultStream: " << DefaultStream << std::endl;
         {
-            std::scoped_lock(multiStreamMutex);
+            // std::scoped_lock(multiStreamMutex);
             if (DefaultStream == nullptr) {
                 DefaultStream = Event->PEER_STREAM_STARTED.Stream;
                 std::cout << "DefaultStream set to: " << DefaultStream << std::endl;
@@ -667,6 +672,7 @@ QUIC_STATUS QuicCommunicator::ServerConnectionCallback(HQUIC Connection, void* C
                 
                 // Notify Read that a new stream has been created and is ready to be used
                 cv.notify_all();
+                std::cout << "ServerConnectionCallback: Notified all threads about new stream" << std::endl;
             }
         }
 
@@ -701,13 +707,16 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
             return QUIC_STATUS_SUCCESS;
 
         case QUIC_STREAM_EVENT_RECEIVE:
+
+            std::cout << "ServerStreamCallback: Received data on stream: " << Stream << std::endl;
             if (multiStreams.find(Stream) == multiStreams.end()) {
                 return QUIC_STATUS_NOT_FOUND;
             }
             
             if (streamStarted[Stream] == false) {
-                
-                std::unique_lock<std::mutex> slock(cudaStreamMapMutex);
+                std::cout << "First data received on stream " << Stream << ", treating it as stream initialization and extracting cuda stream pointer..." << std::endl;
+                // std::unique_lock<std::mutex> slock(cudaStreamMapMutex); //TODO : THIS NEEDS TO BE LOCKED BUT WITHOUT CAUSING A DEADLOCK (REVISIT)
+                std::cout << "Did pass the lock for stream " << Stream << std::endl;
                 cuda_stream_ptr ptr;
                 uint16_t offset = 0;
                 int i = 0;
@@ -718,11 +727,14 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
                     i++;
                 }
 
+                std::cout << "Received new stream with cuda stream pointer: " << ptr << std::endl;
                 cudaStreamMap[ptr] = Stream;
-                slock.unlock();
+                // slock.unlock();
 
                 std::unique_lock<std::mutex> lock(multiStreamMutex);
                 streamStarted[Stream] = true;
+
+                cv.notify_all();
                 return QUIC_STATUS_SUCCESS;
             }
             
@@ -736,6 +748,7 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
                 DEBUG_PRINTF("[sid %lu] [strm %p] [pipe %d] Data received %u, flags %d\n", sid, Stream, wp, b->Length, Event->RECEIVE.Flags);
                 
                 // TODO: May be substituted by non blocking write
+                std::cout << b->Length << " bytes received on stream " << Stream << ", writing to pipe " << wp << std::endl;
                 if (write(wp, b->Buffer, b->Length) == -1) {
                     printf("Failed to write to pipe\n");
                     throw std::runtime_error("Failed to write to pipe");
@@ -832,6 +845,15 @@ QUIC_STATUS QuicCommunicator::ClientStreamCallback(HQUIC Stream, void* Context, 
     QUIC_BUFFER* qb=NULL;
 
     switch (Event->Type) {
+        case QUIC_STREAM_EVENT_START_COMPLETE:
+            if (Event->START_COMPLETE.Status !=  QUIC_STATUS_SUCCESS) {
+                DEBUG_PRINTF("[strm][%p] Stream failed to start, 0x%x\n", Stream, Event->START_COMPLETE.Status);
+                MsQuic->StreamClose(Stream);
+            } else {
+
+            }
+            break;
+
         case QUIC_STREAM_EVENT_SEND_COMPLETE:
             qb = (QUIC_BUFFER*)Event->SEND_COMPLETE.ClientContext;
 
@@ -936,16 +958,17 @@ size_t QuicCommunicator::Read_Async(char *buffer, size_t size, cuda_stream_ptr s
     // TODO: REVIEW THIS FUNCTION
     ssize_t ret_value=0;
     ssize_t size_left=size;
-    if (cudaStreamMap.find(stream) == cudaStreamMap.end()) {
-        std::unique_lock<std::mutex> lock(listenerMutex);
-        cv.wait(lock, [this, stream] { return cudaStreamMap.find(stream) != cudaStreamMap.end(); });
-    } 
+    // if (cudaStreamMap.find(stream) == cudaStreamMap.end()) {
+    //     std::unique_lock<std::mutex> lock(listenerMutex);
+    //     cv.wait(lock, [this, stream] { return cudaStreamMap.find(stream) != cudaStreamMap.end(); });
+    // } 
     // std::cout << "Pipe for DefaultStream is ready, proceeding with read" << std::endl;
-
+    std::cout << "QuicCommunicator::Read_Async called with stream: " << stream << " and size: " << size << std::endl;
     while(size_left>0) {
-
+        std::cout << "REading data... size left: " << size_left << ", ret_value: " << ret_value << std::endl;
         DEBUG_PRINTF("[sid %lu] QuicCommunicator::Read() Block on read() %ld %lu %lu\n", sid, ret_value,size,size_left);
-        ssize_t r = read(multiStreams[DefaultStream].read, buffer+ret_value, size_left);
+        ssize_t r = read(multiStreams[cudaStreamMap[stream]].read, buffer+ret_value, size_left);
+        std::cout << "Passed read() with return value: " << r << std::endl;
 
         if (r < 0) {
             DEBUG_PRINTF("errno %d\n",errno);
@@ -969,6 +992,7 @@ size_t QuicCommunicator::Read_Async(char *buffer, size_t size, cuda_stream_ptr s
         DEBUG_PRINTF("[sid %lu] Read return value: %ld %ld %lu %lu\n",sid ,r,ret_value,size,size_left);
     }
 
+    std::cout << "Finished reading data, total bytes read: " << ret_value << std::endl;
 
     return ret_value;
 }
@@ -1036,7 +1060,7 @@ size_t QuicCommunicator::Write(const char *buffer, size_t size) {
 size_t QuicCommunicator::Write_Async(const char *buffer, size_t size, cuda_stream_ptr stream) {
 
     QUIC_STATUS Status;
-
+    std::cout << "QuicCommunicator::Write_Async called with stream: " << stream << " and size: " << size << std::endl;
     //
     // Allocates and builds the buffer to send over the stream.
     //
@@ -1045,10 +1069,20 @@ size_t QuicCommunicator::Write_Async(const char *buffer, size_t size, cuda_strea
     size_t send_size = 0;
     size_t send_size_cum = 0;
 
+    if (cudaStreamMap.find(stream) == cudaStreamMap.end()) {
+        printf("CUDA stream not found in map\n");
+        std::cout << stream << std::endl;
+        void * a;
+        memcpy(&a, buffer, size);
+        std::cout << a << std::endl;
+        // std::unique_lock<std::mutex> lock(cudaStreamMapMutex);
+        // cv.wait(lock, [this, stream] { return cudaStreamMap.find(stream) != cudaStreamMap.end(); });
+    }
 
 
     while (size_left>0)
     {
+        std::cout << "Size left: " << size_left << ", send size cumulative: " << send_size_cum << std::endl;
         uint8_t* SendBufferRaw;
         QUIC_BUFFER* SendBuffer;
         
@@ -1078,10 +1112,6 @@ size_t QuicCommunicator::Write_Async(const char *buffer, size_t size, cuda_strea
         // the stream is shut down (in the send direction) immediately after.
         //
 
-        if (cudaStreamMap.find(stream) == cudaStreamMap.end()) {
-            printf("CUDA stream not found in map\n");
-            
-        }
 
 
         if (QUIC_FAILED(Status = MsQuic->StreamSend(cudaStreamMap[stream] , SendBuffer, 1, QUIC_SEND_FLAG_NONE, SendBuffer))) {
@@ -1115,17 +1145,30 @@ void QuicCommunicator::Start_Stream(cuda_stream_ptr stream) {
             MsQuic->StreamClose(cudaStreamMap[stream]);
             throw "StreamStart failed";
         }
+        std::cout << "Started new stream for CUDA stream: " << stream << ", MsQuic Stream: " << cudaStreamMap[stream] << std::endl;
 
 
         multiStreams[cudaStreamMap[stream]] = InitializePipes();
 
         // Maybe flag should be
 
-        this->Write_Async((char*) &stream, sizeof(cuda_stream_ptr), cudaStreamMap[stream]);
+        this->Write_Async((char*) &stream, sizeof(cuda_stream_ptr), stream);
+        
+        // TODO: THIS NEEDS TO HAVE A Stop_Stream
 
     }
 }
 
+void QuicCommunicator::Server_Start_Stream(cuda_stream_ptr stream) {
+    // This function is called when the server receives a new stream from the client, and it needs to associate that stream with the corresponding CUDA stream pointer. The client sends the CUDA stream pointer as the first message on the new stream, so the server needs to read that message and extract the CUDA stream pointer from it.
+    std::unique_lock<std::mutex> lock(cudaStreamMapMutex);
+    std::cout << "Server_Start_Stream: Received new stream with cuda stream pointer: " << stream << std::endl;
+    if (cudaStreamMap.find(stream) == cudaStreamMap.end()) {
+        std::unique_lock<std::mutex> lock(listenerMutex);
+        cv.wait(lock, [this, stream] { return cudaStreamMap.find(stream) != cudaStreamMap.end() && streamStarted[cudaStreamMap[stream]] == true; });
+    } 
+    std::cout << "Server_Start_Stream: New stream started for CUDA stream: " << stream << ", MsQuic Stream: " << cudaStreamMap[stream] << std::endl;
+}
 
 };
 

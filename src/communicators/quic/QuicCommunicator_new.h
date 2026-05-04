@@ -50,6 +50,7 @@ public:
     size_t Write_Async(const char * buffer, size_t size, cuda_stream_ptr stream);
 
     void Start_Stream(cuda_stream_ptr stream);
+    void Server_Start_Stream(cuda_stream_ptr stream);
     
     void Sync();
     void Close();
