@@ -95,28 +95,15 @@ struct QuicSettingsConfig {
         s.StreamRecvWindowUnidiDefault      = StreamRecvWindowUnidiDefault;
         s.IsSet.StreamRecvWindowUnidiDefault = IsSet_StreamRecvWindowUnidiDefault;
 
-        // --- Newly added fields ---
-        s.EncryptionOffloadAllowed          = EncryptionOffloadAllowed;
-        s.IsSet.EncryptionOffloadAllowed    = IsSet_EncryptionOffloadAllowed;
-        s.ReliableResetEnabled              = ReliableResetEnabled;
-        s.IsSet.ReliableResetEnabled        = IsSet_ReliableResetEnabled;
-        s.OneWayDelayEnabled                = OneWayDelayEnabled;
-        s.IsSet.OneWayDelayEnabled          = IsSet_OneWayDelayEnabled;
-        s.NetStatsEventEnabled              = NetStatsEventEnabled;
-        s.IsSet.NetStatsEventEnabled        = IsSet_NetStatsEventEnabled;
-        s.StreamMultiReceiveEnabled         = StreamMultiReceiveEnabled;
-        s.IsSet.StreamMultiReceiveEnabled   = IsSet_StreamMultiReceiveEnabled;
-        s.XdpEnabled                        = XdpEnabled;
-        s.IsSet.XdpEnabled                  = IsSet_XdpEnabled;
-        s.QTIPEnabled                       = QTIPEnabled;
-        s.IsSet.QTIPEnabled                 = IsSet_QTIPEnabled;
-        s.RioEnabled                        = RioEnabled;
-        s.IsSet.RioEnabled                  = IsSet_RioEnabled;
+        // NOTE: EncryptionOffloadAllowed, ReliableResetEnabled, OneWayDelayEnabled,
+        // NetStatsEventEnabled, StreamMultiReceiveEnabled, XdpEnabled, QTIPEnabled,
+        // RioEnabled exist in QUIC_SETTINGS_INTERNAL only — not in the public
+        // QUIC_SETTINGS struct. They are stored in this config for completeness
+        // but cannot be applied here.
 
         return s;
     }
 
-    // --- Existing fields ---
     uint64_t    IdleTimeoutMs               = 0;    bool IsSet_IdleTimeoutMs               = false;
     uint64_t    HandshakeIdleTimeoutMs      = 0;    bool IsSet_HandshakeIdleTimeoutMs      = false;
     uint32_t    DisconnectTimeoutMs         = 0;    bool IsSet_DisconnectTimeoutMs         = false;
@@ -157,7 +144,8 @@ struct QuicSettingsConfig {
     uint32_t    StreamRecvWindowBidiRemoteDefault = 0; bool IsSet_StreamRecvWindowBidiRemoteDefault = false;
     uint32_t    StreamRecvWindowUnidiDefault = 0;  bool IsSet_StreamRecvWindowUnidiDefault = false;
 
-    // --- Newly added fields ---
+    // Internal-only fields — in QUIC_SETTINGS_INTERNAL but not public QUIC_SETTINGS.
+    // Parsed from JSON and stored, but not applied in ToQuicSettings().
     uint8_t     EncryptionOffloadAllowed    = 0;    bool IsSet_EncryptionOffloadAllowed    = false;
     uint8_t     ReliableResetEnabled        = 0;    bool IsSet_ReliableResetEnabled        = false;
     uint8_t     OneWayDelayEnabled          = 0;    bool IsSet_OneWayDelayEnabled          = false;
@@ -175,7 +163,6 @@ inline void from_json(const nlohmann::json& j, QuicSettingsConfig& s) {
         if (q.contains(key)) q.at(key).get_to(field);
     };
 
-    // --- Existing fields ---
     get("IdleTimeoutMs",                s.IdleTimeoutMs);
     get("IsSet_IdleTimeoutMs",          s.IsSet_IdleTimeoutMs);
     get("HandshakeIdleTimeoutMs",       s.HandshakeIdleTimeoutMs);
@@ -253,7 +240,7 @@ inline void from_json(const nlohmann::json& j, QuicSettingsConfig& s) {
     get("StreamRecvWindowUnidiDefault", s.StreamRecvWindowUnidiDefault);
     get("IsSet_StreamRecvWindowUnidiDefault", s.IsSet_StreamRecvWindowUnidiDefault);
 
-    // --- Newly added fields ---
+    // Internal-only fields (parsed and stored, not applied to QUIC_SETTINGS)
     get("EncryptionOffloadAllowed",     s.EncryptionOffloadAllowed);
     get("IsSet_EncryptionOffloadAllowed", s.IsSet_EncryptionOffloadAllowed);
     get("ReliableResetEnabled",         s.ReliableResetEnabled);
