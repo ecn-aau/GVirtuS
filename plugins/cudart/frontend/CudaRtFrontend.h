@@ -63,6 +63,14 @@ class CudaRtFrontend {
         }
     }
 
+    static inline void Execute_Async_Wait(const char* routine, const Buffer* input_buffer = NULL, void* stream = nullptr) {
+        try {
+            gvirtus::frontend::Frontend::GetFrontend()->Execute_Async_Wait(routine, input_buffer, stream);
+        } catch (const std::exception& e) {
+            cerr << "Execution exception: " << e.what() << endl;
+        }
+    }
+
     static inline void Start_Stream(void* stream) {
         gvirtus::frontend::Frontend::GetFrontend()->Start_Stream(stream);
     }

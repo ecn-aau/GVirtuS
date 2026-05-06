@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <cmath>
 #include <cuda_runtime.h>
+#include <chrono>
 
 __global__ void saxpy(int n, float a, float *x, float *y) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -10,6 +11,7 @@ __global__ void saxpy(int n, float a, float *x, float *y) {
 }
 
 int main() {
+    std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
     int N = 1382400;
     size_t size = N * sizeof(float);
 
@@ -57,7 +59,8 @@ int main() {
         cudaStreamSynchronize(streams[i]);
         cudaStreamDestroy(streams[i]);
     }
-
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     // Verify result
     bool valid = true;
     for (int i = 0; i < N; ++i) {
@@ -70,7 +73,7 @@ int main() {
     }
 
     if (valid) {
-        printf("Result verification passed.\n");
+        printf("Result verification passed. %ld ms\n", duration.count());
     }
 
     cudaFree(d_x);

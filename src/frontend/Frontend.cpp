@@ -46,6 +46,7 @@
 #include <filesystem>
 #include <iostream>
 #include <mutex>
+#include <thread>
 
 #include "communicators/hybrid/HybridCommunicator.h"
 #include "log4cplus/configurator.h"
@@ -69,6 +70,8 @@ using gvirtus::frontend::Frontend;
 static Frontend msFrontend;
 std::mutex gFrontendMutex;
 map<pthread_t, Frontend *> *Frontend::mpFrontends = NULL;
+std::mutex Frontend::asyncOutputBuffersMutex;
+std::map<void*, std::shared_ptr<Frontend::AsyncStreamContext>> Frontend::mpAsyncOutputBuffers;
 static bool initialized = false;
 
 Logger logger;
@@ -325,19 +328,9 @@ void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
 }
 
 void Frontend::Execute_Async(const char *routine, const Buffer *input_buffer, void* stream) {
-    // For now, we can just call the synchronous version as a placeholder.
-    // In a real implementation, this would involve more complex logic to handle
-    // asynchronous execution and CUDA stream management.
     if (input_buffer == nullptr) input_buffer = mpInputBuffer.get();
-
+    std::cout << "Execute_Async Called" << std::endl;
     pid_t tid = syscall(SYS_gettid);
-    pid_t pid = getpid();
-    size_t in_size = input_buffer->GetBufferSize();
-    int exit_code = 0;
-    double server_exec_sec = 0.0;
-    double send_sec = 0.0;
-    double recv_sec = 0.0;
-
     Frontend *frontend = nullptr;
     {
         std::lock_guard<std::mutex> lock(gFrontendMutex);
@@ -354,59 +347,199 @@ void Frontend::Execute_Async(const char *routine, const Buffer *input_buffer, vo
         return;
     }
 
-    // TODO: review, in async this might cause inconsistencies
-    frontend->mRoutinesExecuted++;
-
-    
-    // ===== send routine info first =====
-    auto start_send = steady_clock::now();
-    frontend->_communicator->obj_ptr()->Write_Async(routine, strlen(routine) + 1, stream);
-
-    // TODO: review, in async this might cause inconsistencies
-    frontend->mDataSent += in_size;
-
-    input_buffer->Dump_Async(frontend->_communicator->obj_ptr().get(), stream);
-
-
-    send_sec = duration_cast<milliseconds>(steady_clock::now() - start_send).count() / 1000.0;
-
-    frontend->mpOutputBuffer->Reset();
-
-    // ===== receive exit_code =====
-    auto start_recv = steady_clock::now();
-    frontend->_communicator->obj_ptr()->Read_Async((char *)&exit_code, sizeof(int), stream);
-    frontend->mExitCode = exit_code;
-
-    // ===== receive backend time cost =====
-    frontend->_communicator->obj_ptr()->Read_Async(reinterpret_cast<char *>(&server_exec_sec),
-                                            sizeof(server_exec_sec), stream);
-
-    // ===== receive output buffer =====
-    size_t out_buffer_size = 0;
-    frontend->_communicator->obj_ptr()->Read_Async((char *)&out_buffer_size, sizeof(size_t), stream);
-    frontend->mDataReceived += out_buffer_size;
-
-    // THIS SHOULD BE ASYNC SOMEHOW, maybe through callbacks
-    if (out_buffer_size > 0) {
-        frontend->mpOutputBuffer->Read<char>(frontend->_communicator->obj_ptr().get(),
-                                             out_buffer_size);
+    std::shared_ptr<Buffer> queued_input = std::make_shared<Buffer>(*input_buffer);
+    auto job = std::make_shared<AsyncJob>(std::string(routine), queued_input);
+    std::shared_ptr<AsyncStreamContext> context;
+    {
+        std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+        auto it = mpAsyncOutputBuffers.find(stream);
+        if (it == mpAsyncOutputBuffers.end()) {
+            LOG4CPLUS_ERROR(logger, "Execute_Async called on an unknown stream");
+            return;
+        }
+        context = it->second;
     }
 
+    {
+        std::lock_guard<std::mutex> lock(context->mutex);
+        if (context->stop_requested) {
+            LOG4CPLUS_ERROR(logger, "Execute_Async called after Stop_Stream on stream");
+            return;
+        }
+        context->queue.push(job);
+    }
+    context->cv.notify_one();
+    frontend->mRoutinesExecuted++;
+}
 
-    recv_sec = duration_cast<milliseconds>(steady_clock::now() - start_recv).count() / 1000.0;
+void Frontend::Execute_Async_Wait(const char *routine, const Buffer *input_buffer, void* stream) {
+    if (input_buffer == nullptr) input_buffer = mpInputBuffer.get();
 
-    // ===== update info =====
-    // TODO: review, in async this might cause inconsistencies
-    frontend->mRoutineExecutionTime += server_exec_sec;
-    frontend->mSendingTime += send_sec;
-    frontend->mReceivingTime += recv_sec;
+    pid_t tid = syscall(SYS_gettid);
+    Frontend *frontend = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(gFrontendMutex);
+        auto it = mpFrontends->find(tid);
+        if (it == mpFrontends->end()) {
+            LOG4CPLUS_ERROR(logger, "Cannot send any job request");
+            return;
+        }
+        frontend = it->second;
+    }
 
+    if (frontend->_communicator->obj_ptr()->to_string() != "quiccommunicator") {
+        Execute(routine, input_buffer);
+        return;
+    }
+
+    std::shared_ptr<Buffer> queued_input = std::make_shared<Buffer>(*input_buffer);
+    auto job = std::make_shared<AsyncJob>(std::string(routine), queued_input);
+    std::shared_ptr<AsyncStreamContext> context;
+    {
+        std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+        auto it = mpAsyncOutputBuffers.find(stream);
+        if (it == mpAsyncOutputBuffers.end()) {
+            LOG4CPLUS_ERROR(logger, "Execute_Async_Wait called on an unknown stream");
+            return;
+        }
+        context = it->second;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(context->mutex);
+        if (context->stop_requested) {
+            LOG4CPLUS_ERROR(logger, "Execute_Async_Wait called after Stop_Stream on stream");
+            return;
+        }
+        context->queue.push(job);
+    }
+    context->cv.notify_one();
+    frontend->mRoutinesExecuted++;
+    job->future.get();
+}
+
+void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
+    std::shared_ptr<AsyncStreamContext> context;
+    {
+        std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+        auto it = mpAsyncOutputBuffers.find(stream);
+        if (it == mpAsyncOutputBuffers.end()) {
+            return;
+        }
+        context = it->second;
+    }
+
+    while (true) {
+        std::shared_ptr<AsyncJob> job;
+        {
+            std::unique_lock<std::mutex> lock(context->mutex);
+            context->cv.wait(lock, [context] {
+                return context->stop_requested || !context->queue.empty();
+            });
+            if (context->queue.empty() && context->stop_requested) {
+                break;
+            }
+            job = context->queue.front();
+            context->queue.pop();
+        }
+
+        const std::string &routine = job->routine;
+        std::cout << "Processing async routine '" << routine << "' [pid=" << getpid()
+                  << ", tid=" << syscall(SYS_gettid) << "]\n";
+        std::shared_ptr<Buffer> input_buffer = job->input_buffer;
+        size_t in_size = input_buffer->GetBufferSize();
+        int exit_code = 0;
+        double server_exec_sec = 0.0;
+        double send_sec = 0.0;
+        double recv_sec = 0.0;
+
+        try {
+            std::cout << "Executing asynchonously routine '" << routine << "' [pid=" << getpid()
+                      << ", tid=" << syscall(SYS_gettid) << "]\n";
+
+            auto start_send = steady_clock::now();
+            frontend->_communicator->obj_ptr()->Write_Async(routine.c_str(), routine.size() + 1, stream);
+            frontend->mDataSent += in_size;
+            input_buffer->Dump_Async(frontend->_communicator->obj_ptr().get(), stream);
+            send_sec = duration_cast<milliseconds>(steady_clock::now() - start_send).count() / 1000.0;
+
+            frontend->mpOutputBuffer->Reset();
+            auto start_recv = steady_clock::now();
+            frontend->_communicator->obj_ptr()->Read_Async((char *)&exit_code, sizeof(int), stream);
+            frontend->mExitCode = exit_code;
+            frontend->_communicator->obj_ptr()->Read_Async(reinterpret_cast<char *>(&server_exec_sec),
+                                                          sizeof(server_exec_sec), stream);
+
+            size_t out_buffer_size = 0;
+            frontend->_communicator->obj_ptr()->Read_Async((char *)&out_buffer_size, sizeof(size_t), stream);
+            frontend->mDataReceived += out_buffer_size;
+
+            std::cout << "Received output buffer of size " << out_buffer_size << " bytes\n";
+            recv_sec = duration_cast<milliseconds>(steady_clock::now() - start_recv).count() / 1000.0;
+
+            frontend->mRoutineExecutionTime += server_exec_sec;
+            frontend->mSendingTime += send_sec;
+            frontend->mReceivingTime += recv_sec;
+            job->promise.set_value();
+        } catch (...) {
+            try {
+                job->promise.set_exception(std::current_exception());
+            } catch (...) {
+                // If promise is already satisfied or cannot be set, ignore.
+            }
+        }
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+        mpAsyncOutputBuffers.erase(stream);
+    }
 }
 
 
 void Frontend::Start_Stream(void* stream) {
     if (this->_communicator->obj_ptr()->to_string() == "quiccommunicator") {
         this->_communicator->obj_ptr()->Start_Stream(stream);
+
+        std::shared_ptr<AsyncStreamContext> context = std::make_shared<AsyncStreamContext>();
+        {
+            std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+            mpAsyncOutputBuffers[stream] = context;
+        }
+
+        pid_t tid = syscall(SYS_gettid);
+        Frontend *frontend = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(gFrontendMutex);
+            auto it = mpFrontends->find(tid);
+            if (it == mpFrontends->end()) {
+                LOG4CPLUS_ERROR(logger, "Cannot send any job request");
+                return;
+            }
+            frontend = it->second;
+        }
+
+        std::thread(Execute_Detached, stream, frontend).detach();
+    }
+}
+
+void Frontend::Stop_Stream(void* stream) {
+    if (this->_communicator->obj_ptr()->to_string() == "quiccommunicator") {
+        std::shared_ptr<AsyncStreamContext> context;
+        {
+            std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+            auto it = mpAsyncOutputBuffers.find(stream);
+            if (it != mpAsyncOutputBuffers.end()) {
+                context = it->second;
+            }
+        }
+        if (context) {
+            {
+                std::lock_guard<std::mutex> lock(context->mutex);
+                context->stop_requested = true;
+            }
+            context->cv.notify_one();
+        }
     }
 }
 

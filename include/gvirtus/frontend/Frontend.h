@@ -40,6 +40,12 @@
 #include <gvirtus/communicators/Communicator.h>
 
 #include <map>
+#include <memory>
+#include <mutex>
+#include <queue>
+#include <string>
+#include <condition_variable>
+#include <future>
 
 namespace gvirtus::frontend {
 /**
@@ -86,7 +92,11 @@ class Frontend {
      */
     void Execute(const char *routine, const communicators::Buffer *input_buffer = NULL);
     void Execute_Async(const char *routine, const communicators::Buffer *input_buffer = NULL, void* stream = nullptr);
+    void Execute_Async_Wait(const char *routine, const communicators::Buffer *input_buffer = NULL, void* stream = nullptr);
     void Start_Stream(void* stream);
+    void Stop_Stream(void* stream);
+
+    static void Execute_Detached(void* stream, Frontend* frontend);
 
     /**
      * Prepares the Frontend for the execution. This method _must_ be called
@@ -231,6 +241,29 @@ class Frontend {
 
     int mExitCode;
     static std::map<pthread_t, Frontend *> *mpFrontends;
+
+    static std::mutex streamsMutex;
+    static std::map<void*, pthread_t> mpStreams;
+
+    struct AsyncJob {
+        std::string routine;
+        std::shared_ptr<communicators::Buffer> input_buffer;
+        std::promise<void> promise;
+        std::future<void> future;
+
+        AsyncJob(std::string routine_, std::shared_ptr<communicators::Buffer> input_buffer_)
+            : routine(std::move(routine_)), input_buffer(std::move(input_buffer_)), future(promise.get_future()) {}
+    };
+
+    struct AsyncStreamContext {
+        std::mutex mutex;
+        std::condition_variable cv;
+        std::queue<std::shared_ptr<AsyncJob>> queue;
+        bool stop_requested = false;
+    };
+
+    static std::mutex asyncOutputBuffersMutex;
+    static std::map<void*, std::shared_ptr<AsyncStreamContext>> mpAsyncOutputBuffers;
     bool mpInitialized;
 
     uint64_t mRoutinesExecuted = 0;

@@ -352,8 +352,12 @@ extern "C" __host__ __device__ unsigned CUDARTAPI __cudaPushCallConfiguration(di
     CudaRtFrontend::AddVariableForArguments(sharedMem);
     CudaRtFrontend::AddDevicePointerForArguments(stream);
 
-    CudaRtFrontend::Execute("cudaPushCallConfiguration");
-
+    // Route to async execution if stream is non-zero (async), otherwise sync
+    if (stream != nullptr) {
+        CudaRtFrontend::Execute_Async_Wait("cudaPushCallConfiguration", nullptr, stream);
+    } else {
+        CudaRtFrontend::Execute("cudaPushCallConfiguration");
+    }
     return CudaRtFrontend::GetExitCode();
 }
 
@@ -362,13 +366,17 @@ extern "C" cudaError_t CUDARTAPI __cudaPopCallConfiguration(dim3 *gridDim, dim3 
                                                             cudaStream_t *stream) {
     CudaRtFrontend::Prepare();
 
+    // Determine if this is async based on the current stream context
+    // For pop, we need to retrieve data immediately, so we always sync
+    // The async queueing happened in the push
     CudaRtFrontend::Execute("cudaPopCallConfiguration");
+    std::cout << "Popped with stream: " << *stream << std::endl;
 
     *gridDim = CudaRtFrontend::GetOutputVariable<dim3>();
     *blockDim = CudaRtFrontend::GetOutputVariable<dim3>();
     *sharedMem = CudaRtFrontend::GetOutputVariable<size_t>();
     cudaStream_t stream1 = CudaRtFrontend::GetOutputVariable<cudaStream_t>();
-
+    std::cout << "Retrieved stream from output variable: " << stream1 << std::endl;
     memcpy(stream, &stream1, sizeof(cudaStream_t));
     return CudaRtFrontend::GetExitCode();
 }
