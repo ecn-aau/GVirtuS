@@ -656,15 +656,9 @@ QuicCommunicator::ServerStreamCallback(
     auto communicator = static_cast<QuicCommunicator*>(Context);
     QUIC_BUFFER* qb=NULL;
     DEBUG_PRINTF("[sid %lu] called", sid);
-    int wp = -1;
-    if (QuicCommunicator::pipemap.find(sid) != QuicCommunicator::pipemap.end()) {
-        wp = QuicCommunicator::pipemap[sid];
-        DEBUG_PRINTF("[sid %lu] Get pipe %d %p %d\n",sid, wp,Stream,Event->Type);
-    }
-    else {
-        DEBUG_PRINTF("[sid %lu] Pipe not found pipe %d %p %d\n",sid, wp,Stream,Event->Type);
-        return QUIC_STATUS_SUCCESS;
-    }
+    // Use the instance's own pipe directly — same sid collision fix as ClientStreamCallback.
+    int wp = communicator->ReadPipeFds[1];
+    DEBUG_PRINTF("[sid %lu] Get pipe %d %p %d\n",sid, wp,Stream,Event->Type);
     switch (Event->Type) {
     case QUIC_STREAM_EVENT_SEND_COMPLETE:
         //
@@ -745,16 +739,12 @@ QuicCommunicator::ClientStreamCallback(
 {
     UNREFERENCED_PARAMETER(Context);
     //std::unique_lock<std::mutex> slock(StreamMutex);
-    int wp = -1;
-    if (QuicCommunicator::pipemap.find(sid) != QuicCommunicator::pipemap.end()) {
-        wp = QuicCommunicator::pipemap[sid];
-        DEBUG_PRINTF("Get pipe %lu %d %p %d\n",sid, wp,Stream,Event->Type);
-    }
-    else {
-        DEBUG_PRINTF("Pipe not found pipe %lu %d %p %d\n",sid, wp,Stream,Event->Type);
-        //Todo: stream should be deleted
-        return QUIC_STATUS_SUCCESS;
-    }
+    // Use the instance's own pipe directly — pipemap is keyed by sid which collides
+    // across connections (both use sid=0 for their first stream), so the map lookup was
+    // silently returning the wrong pipe for any second connection. The callback already
+    // receives the correct QuicCommunicator instance via Context, so read directly.
+    int wp = ReadPipeFds[1];
+    DEBUG_PRINTF("Get pipe %lu %d %p %d\n",sid, wp,Stream,Event->Type);
 
     QUIC_BUFFER* qb=NULL;
 
