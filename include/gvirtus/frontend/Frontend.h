@@ -44,6 +44,7 @@
 #include <mutex>
 #include <queue>
 #include <string>
+#include <functional>
 #include <condition_variable>
 #include <future>
 
@@ -80,6 +81,8 @@ class Frontend {
      * @return The instance of the Frontend class.
      */
     static Frontend *GetFrontend(communicators::Communicator *c = NULL);
+    static void SetThreadFrontend(Frontend *frontend);
+    static void SetThreadOutputBuffer(communicators::Buffer *output_buffer);
 
     /**
      * Requests the execution of the CUDA RunTime routine with the arguments
@@ -91,10 +94,14 @@ class Frontend {
      * @param input_buffer the buffer containing the parameters of the routine.
      */
     void Execute(const char *routine, const communicators::Buffer *input_buffer = NULL);
-    void Execute_Async(const char *routine, const communicators::Buffer *input_buffer = NULL, void* stream = nullptr);
-    void Execute_Async_Wait(const char *routine, const communicators::Buffer *input_buffer = NULL, void* stream = nullptr);
+    void Execute_Async(const char *routine, const communicators::Buffer *input_buffer = NULL, void* stream = nullptr,
+                       std::function<void()> callback = nullptr);
+    void Execute_Async_Wait(const char *routine, const communicators::Buffer *input_buffer = nullptr,
+                            void* stream = nullptr, std::function<void()> callback = nullptr,
+                            communicators::Buffer* output_buffer = nullptr);
     void Start_Stream(void* stream);
     void Stop_Stream(void* stream);
+    bool findStream(void* stream);
 
     static void Execute_Detached(void* stream, Frontend* frontend);
 
@@ -107,7 +114,7 @@ class Frontend {
 
     inline communicators::Buffer *GetInputBuffer() { return mpInputBuffer.get(); }
 
-    inline communicators::Buffer *GetOutputBuffer() { return mpOutputBuffer.get(); }
+    communicators::Buffer *GetOutputBuffer();
 
     inline communicators::Buffer *GetLaunchBuffer() { return mpLaunchBuffer.get(); }
 
@@ -248,11 +255,22 @@ class Frontend {
     struct AsyncJob {
         std::string routine;
         std::shared_ptr<communicators::Buffer> input_buffer;
+        std::shared_ptr<communicators::Buffer> output_buffer;
+        std::function<void()> callback;
         std::promise<void> promise;
         std::future<void> future;
 
-        AsyncJob(std::string routine_, std::shared_ptr<communicators::Buffer> input_buffer_)
-            : routine(std::move(routine_)), input_buffer(std::move(input_buffer_)), future(promise.get_future()) {}
+        AsyncJob(std::string routine_, std::shared_ptr<communicators::Buffer> input_buffer_,
+                 std::function<void()> callback_ = nullptr,
+                 communicators::Buffer *output_buffer_ = nullptr)
+            : routine(std::move(routine_)), input_buffer(std::move(input_buffer_)),
+              callback(std::move(callback_)), future(promise.get_future()) {
+            if (output_buffer_) {
+                output_buffer = std::shared_ptr<communicators::Buffer>(output_buffer_, [](communicators::Buffer *) {});
+            } else {
+                output_buffer = std::make_shared<communicators::Buffer>();
+            }
+        }
     };
 
     struct AsyncStreamContext {

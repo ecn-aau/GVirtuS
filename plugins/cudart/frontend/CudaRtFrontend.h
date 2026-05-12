@@ -55,20 +55,26 @@ class CudaRtFrontend {
         }
     }
 
-    static inline void Execute_Async(const char* routine, const Buffer* input_buffer = NULL, void* stream = nullptr) {
+    static inline void Execute_Async(const char* routine, const Buffer* input_buffer = NULL, void* stream = nullptr,
+                                     std::function<void()> callback = nullptr) {
         try {
-            gvirtus::frontend::Frontend::GetFrontend()->Execute_Async(routine, input_buffer, stream);
+            gvirtus::frontend::Frontend::GetFrontend()->Execute_Async(routine, input_buffer, stream, callback);
         } catch (const std::exception& e) {
             cerr << "Execution exception: " << e.what() << endl;
         }
     }
 
-    static inline void Execute_Async_Wait(const char* routine, const Buffer* input_buffer = NULL, void* stream = nullptr) {
+    static inline void Execute_Async_Wait(const char* routine, const Buffer* input_buffer = NULL, void* stream = nullptr,
+                                          std::function<void()> callback = nullptr, Buffer* output_buffer = nullptr) {
         try {
-            gvirtus::frontend::Frontend::GetFrontend()->Execute_Async_Wait(routine, input_buffer, stream);
+            gvirtus::frontend::Frontend::GetFrontend()->Execute_Async_Wait(routine, input_buffer, stream, callback, output_buffer);
         } catch (const std::exception& e) {
             cerr << "Execution exception: " << e.what() << endl;
         }
+    }
+
+    static inline bool findStream(void* stream) {
+        return gvirtus::frontend::Frontend::GetFrontend()->findStream(stream);
     }
 
     static inline void Start_Stream(void* stream) {

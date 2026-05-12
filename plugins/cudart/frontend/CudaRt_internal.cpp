@@ -33,6 +33,7 @@
 #include <cstdio>
 
 #include "CudaRt.h"
+#include <stack>
 
 // Helper: allocate and copy section headers table
 Elf64_Shdr *copySectionHeaders(const Elf64_Ehdr *eh) {
@@ -342,6 +343,8 @@ extern "C" __host__ int __cudaSynchronizeThreads(void **x, void *y) {
     return 0;
 }
 
+static thread_local std::stack<void*> streamStack;
+
 extern "C" __host__ __device__ unsigned CUDARTAPI __cudaPushCallConfiguration(dim3 gridDim,
                                                                               dim3 blockDim,
                                                                               size_t sharedMem,
@@ -354,7 +357,9 @@ extern "C" __host__ __device__ unsigned CUDARTAPI __cudaPushCallConfiguration(di
 
     // Route to async execution if stream is non-zero (async), otherwise sync
     if (stream != nullptr) {
-        CudaRtFrontend::Execute_Async_Wait("cudaPushCallConfiguration", nullptr, stream);
+        std::cout << "Pushing with stream: " << stream << "with tid: " << syscall(SYS_gettid) << std::endl;
+        CudaRtFrontend::Execute_Async("cudaPushCallConfiguration", nullptr, stream);
+        streamStack.push(stream);
     } else {
         CudaRtFrontend::Execute("cudaPushCallConfiguration");
     }
@@ -369,14 +374,29 @@ extern "C" cudaError_t CUDARTAPI __cudaPopCallConfiguration(dim3 *gridDim, dim3 
     // Determine if this is async based on the current stream context
     // For pop, we need to retrieve data immediately, so we always sync
     // The async queueing happened in the push
-    CudaRtFrontend::Execute("cudaPopCallConfiguration");
-    std::cout << "Popped with stream: " << *stream << std::endl;
+    if (!streamStack.empty()) {
+        std::shared_ptr<Buffer> output_buffer = std::make_shared<Buffer>();
+        auto last_stream = streamStack.top();
+        streamStack.pop();
+        CudaRtFrontend::Execute_Async_Wait("cudaPopCallConfiguration", nullptr, last_stream, nullptr, output_buffer.get());
+        *gridDim = output_buffer->Get<dim3>();;
+        *blockDim = output_buffer->Get<dim3>();
+        *sharedMem = output_buffer->Get<size_t>();
+        cudaStream_t stream1 = output_buffer->Get<cudaStream_t>();
+        std::cout << "Popped with stream: " << stream1 << std::endl;
+        memcpy(stream, &stream1, sizeof(cudaStream_t));
 
-    *gridDim = CudaRtFrontend::GetOutputVariable<dim3>();
-    *blockDim = CudaRtFrontend::GetOutputVariable<dim3>();
-    *sharedMem = CudaRtFrontend::GetOutputVariable<size_t>();
-    cudaStream_t stream1 = CudaRtFrontend::GetOutputVariable<cudaStream_t>();
-    std::cout << "Retrieved stream from output variable: " << stream1 << std::endl;
-    memcpy(stream, &stream1, sizeof(cudaStream_t));
-    return CudaRtFrontend::GetExitCode();
+
+    } else {
+        CudaRtFrontend::Execute("cudaPopCallConfiguration");
+        std::cout << "Popped with stream: " << *stream << std::endl;
+        
+        *gridDim = CudaRtFrontend::GetOutputVariable<dim3>();
+        *blockDim = CudaRtFrontend::GetOutputVariable<dim3>();
+        *sharedMem = CudaRtFrontend::GetOutputVariable<size_t>();
+        cudaStream_t stream1 = CudaRtFrontend::GetOutputVariable<cudaStream_t>();
+        std::cout << "Retrieved stream from output variable: " << stream1 << std::endl;
+        memcpy(stream, &stream1, sizeof(cudaStream_t));
+    }
+        return CudaRtFrontend::GetExitCode();
 }

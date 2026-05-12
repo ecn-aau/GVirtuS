@@ -568,9 +568,9 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaMemcpyAsync(void *dst, const void 
             CudaRtFrontend::AddVariableForArguments(count);
             CudaRtFrontend::AddVariableForArguments(kind);
             CudaRtFrontend::AddDevicePointerForArguments(stream);
-            CudaRtFrontend::Execute("cudaMemcpyAsync"); //, nullptr, (void *) stream);
+            CudaRtFrontend::Execute_Async("cudaMemcpyAsync", nullptr, (void *) stream);
             return cudaSuccess;
-        case cudaMemcpyDeviceToHost:
+        case cudaMemcpyDeviceToHost: {
             // cout << "cudaMemcpyAsync DeviceToHost" << endl;
             /* NOTE: adding a fake host pointer */
             CudaRtFrontend::AddHostPointerForArguments("");
@@ -578,14 +578,15 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaMemcpyAsync(void *dst, const void 
             CudaRtFrontend::AddVariableForArguments(count);
             CudaRtFrontend::AddVariableForArguments(kind);
             CudaRtFrontend::AddDevicePointerForArguments(stream);
-            // cout << "cudaMemcpyAsync DeviceToHost: "
-            //      << "dst: " << dst << ", src: " << src << ", count: " << count
-            //      << ", kind: " << kind << ", stream: " << stream << endl;
-            CudaRtFrontend::Execute("cudaMemcpyAsync");
-            if (CudaRtFrontend::Success()) {
-                memmove(dst, CudaRtFrontend::GetOutputHostPointer<char>(count), count);
-            }
-            break;
+            // return immediately and copy output back when the async callback fires
+            CudaRtFrontend::Execute_Async("cudaMemcpyAsync", nullptr, stream,
+                [dst, count]() {
+                    if (CudaRtFrontend::Success()) {
+                        memmove(dst, CudaRtFrontend::GetOutputHostPointer<char>(count), count);
+                    }
+                });
+            return cudaSuccess;
+        }
         case cudaMemcpyDeviceToDevice:
             // cout << "cudaMemcpyAsync DeviceToDevice" << endl;
             CudaRtFrontend::AddDevicePointerForArguments(dst);
