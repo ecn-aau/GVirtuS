@@ -460,6 +460,23 @@ void Frontend::Execute_Async_Wait(const char *routine, const communicators::Buff
     job->future.get();
 }
 
+void Frontend::Wait_Stream(void* stream) {
+    std::shared_ptr<AsyncStreamContext> context;
+    {
+        std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
+        auto it = mpAsyncOutputBuffers.find(stream);
+        if (it == mpAsyncOutputBuffers.end()) {
+            return;
+        }
+        context = it->second;
+    }
+
+    std::unique_lock<std::mutex> lock(context->mutex);
+    context->cv.wait(lock, [context] {
+        return !context->active_job && context->queue.empty();
+    });
+}
+
 void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
     std::shared_ptr<AsyncStreamContext> context;
     {
@@ -483,6 +500,7 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
             }
             job = context->queue.front();
             context->queue.pop();
+            context->active_job = true;
         }
 
         const std::string &routine = job->routine;
@@ -505,7 +523,7 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
             input_buffer->Dump_Async(frontend->_communicator->obj_ptr().get(), stream);
             send_sec = duration_cast<milliseconds>(steady_clock::now() - start_send).count() / 1000.0;
 
-            Buffer *async_output_buffer = job->output_buffer.get();
+                        Buffer *async_output_buffer = job->output_buffer.get();
             async_output_buffer->Reset();
             auto start_recv = steady_clock::now();
             frontend->_communicator->obj_ptr()->Read_Async((char *)&exit_code, sizeof(int), stream);
@@ -527,7 +545,6 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
             frontend->mSendingTime += send_sec;
             frontend->mReceivingTime += recv_sec;
             if (job->callback) {
-                // Register this frontend and output buffer for the current thread so the callback can find it
                 Frontend::SetThreadFrontend(frontend);
                 Frontend::SetThreadOutputBuffer(async_output_buffer);
                 try {
@@ -537,7 +554,6 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
                 } catch (...) {
                     LOG4CPLUS_ERROR(logger, "Async callback exception: unknown error");
                 }
-                // Unregister after callback completes
                 Frontend::SetThreadOutputBuffer(nullptr);
                 Frontend::SetThreadFrontend(nullptr);
             }
@@ -549,6 +565,11 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
                 // If promise is already satisfied or cannot be set, ignore.
             }
         }
+        {
+            std::lock_guard<std::mutex> lock(context->mutex);
+            context->active_job = false;
+        }
+        context->cv.notify_all();
     }
 
     {

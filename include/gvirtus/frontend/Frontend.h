@@ -101,6 +101,7 @@ class Frontend {
                             communicators::Buffer* output_buffer = nullptr);
     void Start_Stream(void* stream);
     void Stop_Stream(void* stream);
+    void Wait_Stream(void* stream);
     bool findStream(void* stream);
 
     static void Execute_Detached(void* stream, Frontend* frontend);
@@ -278,6 +279,7 @@ class Frontend {
         std::condition_variable cv;
         std::queue<std::shared_ptr<AsyncJob>> queue;
         bool stop_requested = false;
+        bool active_job = false;
     };
 
     static std::mutex asyncOutputBuffersMutex;
