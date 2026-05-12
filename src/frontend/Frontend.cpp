@@ -208,7 +208,7 @@ Frontend *Frontend::GetFrontend(Communicator *c) {
         auto it = mpFrontends->find(tid);
         if (it != mpFrontends->end()) return it->second;
     }
-    std::cout << "Creating new Frontend for tid: " << tid << std::endl;
+    // std::cout << "Creating new Frontend for tid: " << tid << std::endl;
     Frontend *f = new Frontend();
     try {
         f->Init(c);
@@ -342,14 +342,14 @@ void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
         }
     }
 
-    std::cout << "[GVIRTUS] Routine '" << routine << "' executed with exit code " << exit_code
-              << " in " << server_exec_sec << " second(s)\n";
+    // std::cout << "[GVIRTUS] Routine '" << routine << "' executed with exit code " << exit_code
+            //   << " in " << server_exec_sec << " second(s)\n";
 }
 
 void Frontend::Execute_Async(const char *routine, const Buffer *input_buffer, void* stream,
                               std::function<void()> callback) {
     if (input_buffer == nullptr) input_buffer = mpInputBuffer.get();
-    std::cout << "Execute_Async Called" << std::endl;
+    // std::cout << "Execute_Async Called" << std::endl;
     pid_t tid = syscall(SYS_gettid);
     Frontend *frontend = nullptr;
     {
@@ -504,8 +504,8 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
         }
 
         const std::string &routine = job->routine;
-        std::cout << "Processing async routine '" << routine << "' [pid=" << getpid()
-                  << ", tid=" << syscall(SYS_gettid) << "]\n";
+        // std::cout << "Processing async routine '" << routine << "' [pid=" << getpid()
+                //   << ", tid=" << syscall(SYS_gettid) << "]\n";
         std::shared_ptr<Buffer> input_buffer = job->input_buffer;
         size_t in_size = input_buffer->GetBufferSize();
         int exit_code = 0;
@@ -514,8 +514,8 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
         double recv_sec = 0.0;
 
         try {
-            std::cout << "Executing asynchonously routine '" << routine << "' [pid=" << getpid()
-                      << ", tid=" << syscall(SYS_gettid) << "]\n";
+            // std::cout << "Executing asynchonously routine '" << routine << "' [pid=" << getpid()
+                    //   << ", tid=" << syscall(SYS_gettid) << "]\n";
 
             auto start_send = steady_clock::now();
             frontend->_communicator->obj_ptr()->Write_Async(routine.c_str(), routine.size() + 1, stream);
@@ -538,7 +538,7 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
                 async_output_buffer->Reset_Async(frontend->_communicator->obj_ptr().get(), stream, out_buffer_size);
             }
 
-            std::cout << "Received output buffer of size " << out_buffer_size << " bytes\n";
+            // std::cout << "Received output buffer of size " << out_buffer_size << " bytes\n";
             recv_sec = duration_cast<milliseconds>(steady_clock::now() - start_recv).count() / 1000.0;
 
             frontend->mRoutineExecutionTime += server_exec_sec;
@@ -602,7 +602,7 @@ void Frontend::Start_Stream(void* stream) {
         }
 
         std::thread(Execute_Detached, stream, frontend).detach();
-        std::cout << "Started async stream with id " << stream << " on tid " << tid << std::endl;
+        // std::cout << "Started async stream with id " << stream << " on tid " << tid << std::endl;
     }
 }
 
