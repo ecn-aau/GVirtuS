@@ -410,7 +410,7 @@ Pipes gvirtus::communicators::QuicCommunicator::InitializePipes() {
     }
     Pipes fdPipes {pipes[0], pipes[1]};
 
-    int pipe_size = 4096 * 4096 * 4; // 1MB buffer or adjust as needed
+    int pipe_size = 4096 * 4096 * 4; // ~64MB buffer
     fcntl(fdPipes.read, F_SETPIPE_SZ, pipe_size);
     fcntl(fdPipes.write, F_SETPIPE_SZ, pipe_size);
 
@@ -648,7 +648,22 @@ QUIC_STATUS QuicCommunicator::ServerConnectionCallback(HQUIC Connection, void* C
         //
         printf("[conn][%p] All done\n", Connection);
         MsQuic->ConnectionClose(Connection);
-        // TODO: Should free all streams.
+        // Close all remaining pipe FDs for this connection. This handles both
+        // graceful closes and transport aborts (0x6e idle timeout), where
+        // PEER_SEND_SHUTDOWN / STREAM_SHUTDOWN_COMPLETE may not have fired
+        // for every stream yet (e.g. the DefaultStream, or streams that were
+        // aborted rather than gracefully shut down).
+        {
+            std::scoped_lock<std::mutex> lck(multiStreamMutex);
+            for (auto& kv : multiStreams) {
+                if (kv.second.write != -1) close(kv.second.write);
+                if (kv.second.read  != -1) close(kv.second.read);
+            }
+            multiStreams.clear();
+            cudaStreamMap.clear();
+            streamStarted.clear();
+            DefaultStream = nullptr;
+        }
         break;
         
     case QUIC_CONNECTION_EVENT_PEER_STREAM_STARTED:
@@ -663,7 +678,7 @@ QUIC_STATUS QuicCommunicator::ServerConnectionCallback(HQUIC Connection, void* C
             }
             MsQuic->SetCallbackHandler(Event->PEER_STREAM_STARTED.Stream, (void *) ServerStreamCallbackWrapper, this);
             {
-                std::scoped_lock(multiStreamMutex);
+                std::scoped_lock<std::mutex> lck(multiStreamMutex);
                 multiStreams[Event->PEER_STREAM_STARTED.Stream] = InitializePipes();
                 
                 // Notify Read that a new stream has been created and is ready to be used
@@ -717,6 +732,20 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
                     offset += chunk_size;
                     i++;
                 }
+                // If a previous stream was mapped to this CUDA stream pointer
+                // (handle reuse after cudaStreamDestroy), close its write pipe
+                // end so the old execute_async thread gets EOF and exits.
+                auto oldIt = cudaStreamMap.find(ptr);
+                if (oldIt != cudaStreamMap.end()) {
+                    HQUIC oldHquic = oldIt->second;
+                    auto pipeIt = multiStreams.find(oldHquic);
+                    if (pipeIt != multiStreams.end() && pipeIt->second.write != -1) {
+                        close(pipeIt->second.write);
+                        pipeIt->second.write = -1;
+                    }
+                    streamStarted.erase(oldHquic);
+                    cudaStreamMap.erase(oldIt);
+                }
                 cudaStreamMap[ptr] = Stream;
                 // slock.unlock();
 
@@ -748,6 +777,32 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
 
         case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
             DEBUG_PRINTF("[strm][%p] Peer shut down\n", Stream);
+            {
+                std::scoped_lock<std::mutex> slock(multiStreamMutex);
+                auto pipeIt = multiStreams.find(Stream);
+                if (pipeIt != multiStreams.end()) {
+                    if (pipeIt->second.write != -1) {
+                        close(pipeIt->second.write);
+                        pipeIt->second.write = -1;
+                    }
+                    if (pipeIt->second.read != -1) {
+                        close(pipeIt->second.read);
+                        pipeIt->second.read = -1;
+                    }
+                    multiStreams.erase(pipeIt);
+                }
+                // Remove cudaStreamMap and streamStarted entries.
+                streamStarted.erase(Stream);
+                for (auto it = cudaStreamMap.begin(); it != cudaStreamMap.end(); ) {
+                    if (it->second == Stream) {
+                        it = cudaStreamMap.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+            }
+            // Shut down server send side so QUIC fires SHUTDOWN_COMPLETE.
+            MsQuic->StreamShutdown(Stream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
             return QUIC_STATUS_SUCCESS;
 
         case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
@@ -761,8 +816,9 @@ QUIC_STATUS QuicCommunicator::ServerStreamCallback(HQUIC Stream, void* Context, 
             
             if (multiStreams.find(Stream) != multiStreams.end()) {
                 std::scoped_lock(multiStreamMutex);
+                if (multiStreams[Stream].write != -1)
+                    close(multiStreams[Stream].write);
                 close(multiStreams[Stream].read);
-                close(multiStreams[Stream].write);
                 multiStreams.erase(Stream);
 
             }
@@ -886,6 +942,16 @@ QUIC_STATUS QuicCommunicator::ClientStreamCallback(HQUIC Stream, void* Context, 
             if (!Event->SHUTDOWN_COMPLETE.AppCloseInProgress) {
                 MsQuic->StreamClose(Stream);
             }
+            // Clean up the client-side pipe pair for this stream.
+            {
+                std::scoped_lock<std::mutex> lck(multiStreamMutex);
+                auto it = multiStreams.find(Stream);
+                if (it != multiStreams.end()) {
+                    if (it->second.write != -1) close(it->second.write);
+                    close(it->second.read);
+                    multiStreams.erase(it);
+                }
+            }
             break;
 
         default:
@@ -961,19 +1027,21 @@ size_t QuicCommunicator::Read_Async(char *buffer, size_t size, cuda_stream_ptr s
                 //usleep(10);
                 continue;
             }
-            continue;
+            break;
         }
         
-        if (r < 0 || r==0){
+        if (r == 0) {
+            // EOF: the write end of the pipe was closed (stream shut down).
+            // Exit cleanly so the execute_async thread can exit instead of
+            // spinning and starving QUIC packet-processing threads.
             ret_value = 0;
-            continue;
+            break;
         }
-        else {
+
             ret_value += r;
-            size_left=size_left-r;
+        size_left = size_left - r;
             if (size_left == 0)
                 break;
-        }
         DEBUG_PRINTF("[sid %lu] Read return value: %ld %ld %lu %lu\n",sid ,r,ret_value,size,size_left);
     }
 
@@ -1109,7 +1177,7 @@ void QuicCommunicator::Start_Stream(cuda_stream_ptr stream) {
     QUIC_STATUS Status;
 
     if (cudaStreamMap.find(stream) == cudaStreamMap.end()) {
-        std::scoped_lock(cudaStreamMapMutex);
+        std::scoped_lock<std::mutex> lck(cudaStreamMapMutex);
         // Open Stream
         cudaStreamMap[stream] = nullptr;
         if (QUIC_FAILED(Status = MsQuic->StreamOpen(Connection, QUIC_STREAM_OPEN_FLAG_NONE, ClientStreamCallbackWrapper, this, &cudaStreamMap[stream]))) {
@@ -1127,13 +1195,34 @@ void QuicCommunicator::Start_Stream(cuda_stream_ptr stream) {
 
         multiStreams[cudaStreamMap[stream]] = InitializePipes();
 
-        // Maybe flag should be
-
         this->Write_Async((char*) &stream, sizeof(cuda_stream_ptr), stream);
-        
-        // TODO: THIS NEEDS TO HAVE A Stop_Stream
-
     }
+}
+
+void QuicCommunicator::Stop_Stream(cuda_stream_ptr stream) {
+    auto it = cudaStreamMap.find(stream);
+    if (it == cudaStreamMap.end()) return;
+    HQUIC hStream = it->second;
+    // Close BOTH ends of the client-side pipe and erase the entry from
+    // multiStreams immediately. This ensures:
+    //   1. Execute_Detached's Read_Async gets EOF (write closed) or EBADF
+    //      (read closed) and exits — no blocked thread leaking FDs.
+    //   2. The read FD is not held open until the connection closes (which
+    //      would cause gradual FD accumulation and increasing d2h latency
+    //      over many stream create/destroy cycles).
+    // Execute_Detached handles r==0 and r<0 (EBADF) with break, so closing
+    // both FDs here while it may be mid-read is safe.
+    {
+        std::scoped_lock<std::mutex> lck(multiStreamMutex);
+        auto pipeIt = multiStreams.find(hStream);
+        if (pipeIt != multiStreams.end()) {
+            if (pipeIt->second.write != -1) close(pipeIt->second.write);
+            if (pipeIt->second.read  != -1) close(pipeIt->second.read);
+            multiStreams.erase(pipeIt);
+        }
+    }
+    MsQuic->StreamShutdown(hStream, QUIC_STREAM_SHUTDOWN_FLAG_GRACEFUL, 0);
+    cudaStreamMap.erase(it);
 }
 
 void QuicCommunicator::Server_Start_Stream(cuda_stream_ptr stream) {

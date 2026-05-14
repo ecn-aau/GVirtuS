@@ -81,6 +81,10 @@ class CudaRtFrontend {
         gvirtus::frontend::Frontend::GetFrontend()->Start_Stream(stream);
     }
 
+    static inline void Stop_Stream(void* stream) {
+        gvirtus::frontend::Frontend::GetFrontend()->Stop_Stream(stream);
+    }
+
     static inline void Wait_Stream(void* stream) {
         gvirtus::frontend::Frontend::GetFrontend()->Wait_Stream(stream);
     }

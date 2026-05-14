@@ -56,6 +56,8 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaStreamDestroy(cudaStream_t stream)
     CudaRtFrontend::Prepare();
     CudaRtFrontend::AddDevicePointerForArguments(stream);
     CudaRtFrontend::Execute("cudaStreamDestroy");
+    // Shut down the QUIC channel and signal the frontend worker thread.
+    CudaRtFrontend::Stop_Stream(stream);
     return CudaRtFrontend::GetExitCode();
 }
 

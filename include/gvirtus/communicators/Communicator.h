@@ -55,6 +55,7 @@ class Communicator {
     virtual size_t Write(const char *buffer, size_t size) = 0;
     virtual size_t Write_Async(const char * buffer, size_t size, void* stream) { return 0; }
     virtual void Start_Stream(void* stream) {}
+    virtual void Stop_Stream(void* stream) {}
     virtual void Server_Start_Stream(void* stream) {}
     virtual void Sync() = 0;
 

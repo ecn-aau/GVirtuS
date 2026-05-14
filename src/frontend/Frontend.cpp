@@ -208,7 +208,7 @@ Frontend *Frontend::GetFrontend(Communicator *c) {
         auto it = mpFrontends->find(tid);
         if (it != mpFrontends->end()) return it->second;
     }
-    // std::cout << "Creating new Frontend for tid: " << tid << std::endl;
+
     Frontend *f = new Frontend();
     try {
         f->Init(c);
@@ -342,14 +342,14 @@ void Frontend::Execute(const char *routine, const Buffer *input_buffer) {
         }
     }
 
-    // std::cout << "[GVIRTUS] Routine '" << routine << "' executed with exit code " << exit_code
-            //   << " in " << server_exec_sec << " second(s)\n";
+    std::cout << "[GVIRTUS] Routine '" << routine << "' executed with exit code " << exit_code
+              << " in " << server_exec_sec << " second(s)\n";
 }
 
 void Frontend::Execute_Async(const char *routine, const Buffer *input_buffer, void* stream,
                               std::function<void()> callback) {
     if (input_buffer == nullptr) input_buffer = mpInputBuffer.get();
-    // std::cout << "Execute_Async Called" << std::endl;
+    LOG4CPLUS_DEBUG(logger, "Queued (async) '" << routine << "' | pid=" << getpid() << " tid=" << syscall(SYS_gettid));
     pid_t tid = syscall(SYS_gettid);
     Frontend *frontend = nullptr;
     {
@@ -404,6 +404,7 @@ void Frontend::Execute_Async(const char *routine, const Buffer *input_buffer, vo
 void Frontend::Execute_Async_Wait(const char *routine, const communicators::Buffer *input_buffer, void* stream,
                                    std::function<void()> callback, communicators::Buffer *output_buffer) {
     if (input_buffer == nullptr) input_buffer = mpInputBuffer.get();
+    LOG4CPLUS_DEBUG(logger, "Queued (async-wait) '" << routine << "' | pid=" << getpid() << " tid=" << syscall(SYS_gettid));
 
     pid_t tid = syscall(SYS_gettid);
     Frontend *frontend = nullptr;
@@ -504,8 +505,8 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
         }
 
         const std::string &routine = job->routine;
-        // std::cout << "Processing async routine '" << routine << "' [pid=" << getpid()
-                //   << ", tid=" << syscall(SYS_gettid) << "]\n";
+        std::cout << "Processing async routine '" << routine << "' [pid=" << getpid()
+                  << ", tid=" << syscall(SYS_gettid) << "]\n";
         std::shared_ptr<Buffer> input_buffer = job->input_buffer;
         size_t in_size = input_buffer->GetBufferSize();
         int exit_code = 0;
@@ -514,8 +515,8 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
         double recv_sec = 0.0;
 
         try {
-            // std::cout << "Executing asynchonously routine '" << routine << "' [pid=" << getpid()
-                    //   << ", tid=" << syscall(SYS_gettid) << "]\n";
+            std::cout << "Executing asynchonously routine '" << routine << "' [pid=" << getpid()
+                      << ", tid=" << syscall(SYS_gettid) << "]\n";
 
             auto start_send = steady_clock::now();
             frontend->_communicator->obj_ptr()->Write_Async(routine.c_str(), routine.size() + 1, stream);
@@ -526,6 +527,8 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
                         Buffer *async_output_buffer = job->output_buffer.get();
             async_output_buffer->Reset();
             auto start_recv = steady_clock::now();
+            int async_exit_code = 0;
+            double async_server_exec_sec = 0.0;
             frontend->_communicator->obj_ptr()->Read_Async((char *)&exit_code, sizeof(int), stream);
             frontend->mExitCode = exit_code;
             frontend->_communicator->obj_ptr()->Read_Async(reinterpret_cast<char *>(&server_exec_sec),
@@ -538,12 +541,22 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
                 async_output_buffer->Reset_Async(frontend->_communicator->obj_ptr().get(), stream, out_buffer_size);
             }
 
-            // std::cout << "Received output buffer of size " << out_buffer_size << " bytes\n";
+            std::cout << "Received output buffer of size " << out_buffer_size << " bytes\n";
             recv_sec = duration_cast<milliseconds>(steady_clock::now() - start_recv).count() / 1000.0;
 
-            frontend->mRoutineExecutionTime += server_exec_sec;
+            frontend->mRoutineExecutionTime += async_server_exec_sec;
             frontend->mSendingTime += send_sec;
             frontend->mReceivingTime += recv_sec;
+
+            LOG4CPLUS_DEBUG(logger, "Routine '" << routine << "' returned " << async_exit_code
+                                                << " | server_exec=" << async_server_exec_sec << "s"
+                                                << " | send=" << send_sec << "s"
+                                                << " | recv=" << recv_sec << "s"
+                                                << " | in=" << in_size << "B"
+                                                << " | out=" << out_buffer_size << "B"
+                                                << " | pid=" << getpid()
+                                                << " tid=" << syscall(SYS_gettid));
+
             if (job->callback) {
                 Frontend::SetThreadFrontend(frontend);
                 Frontend::SetThreadOutputBuffer(async_output_buffer);
@@ -574,7 +587,10 @@ void Frontend::Execute_Detached(void *stream, Frontend* frontend) {
 
     {
         std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);
-        mpAsyncOutputBuffers.erase(stream);
+        auto it = mpAsyncOutputBuffers.find(stream);
+        if (it != mpAsyncOutputBuffers.end() && it->second == context) {
+            mpAsyncOutputBuffers.erase(it);
+        }
     }
 }
 
@@ -602,12 +618,15 @@ void Frontend::Start_Stream(void* stream) {
         }
 
         std::thread(Execute_Detached, stream, frontend).detach();
-        // std::cout << "Started async stream with id " << stream << " on tid " << tid << std::endl;
     }
 }
 
 void Frontend::Stop_Stream(void* stream) {
     if (this->_communicator->obj_ptr()->to_string() == "quiccommunicator") {
+        // Shut down the QUIC stream so the backend's execute_async thread
+        // gets EOF on its pipe read and exits cleanly.
+        this->_communicator->obj_ptr()->Stop_Stream(stream);
+
         std::shared_ptr<AsyncStreamContext> context;
         {
             std::lock_guard<std::mutex> lock(asyncOutputBuffersMutex);

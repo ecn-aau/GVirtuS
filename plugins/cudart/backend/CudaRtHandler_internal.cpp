@@ -401,6 +401,7 @@ CUDA_ROUTINE_HANDLER(PopCallConfiguration) {
         pThis->PushSavedCallConfiguration(cfg);
 
         std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
+
         out->Add(gridDim);
         out->Add(blockDim);
         out->AddMarshal(sharedMem);

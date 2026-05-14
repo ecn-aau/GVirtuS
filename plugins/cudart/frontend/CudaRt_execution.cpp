@@ -172,7 +172,6 @@ extern "C" __host__ cudaError_t cudaLaunchHostFunc(cudaStream_t stream, cudaHost
 extern "C" __host__ cudaError_t cudaLaunchKernel(const void *func, dim3 gridDim, dim3 blockDim,
                                                  void **args, size_t sharedMem,
                                                  cudaStream_t stream) {
-    std::cout << "CudaLaunch Kernel" << std::endl;
     CudaRtFrontend::Prepare();
     CudaRtFrontend::AddDevicePointerForArguments(func);
     CudaRtFrontend::AddVariableForArguments(gridDim);
