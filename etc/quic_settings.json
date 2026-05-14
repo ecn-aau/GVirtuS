@@ -112,9 +112,10 @@
 
     "StreamRecvWindowBidiRemoteDefault": 8388608,
     "IsSet_StreamRecvWindowBidiRemoteDefault": true,
-    "StreamRecvWindowUnidiDefault": 8388608,
 
+    "StreamRecvWindowUnidiDefault": 8388608,
     "IsSet_StreamRecvWindowUnidiDefault": true,
+    
     "EncryptionOffloadAllowed": 1,
     "IsSet_EncryptionOffloadAllowed": true,
 
