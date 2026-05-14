@@ -80,6 +80,18 @@ CUDA_ROUTINE_HANDLER(LaunchKernel) {
     size_t sharedMem = input_buffer->Get<size_t>();
     cudaStream_t stream = input_buffer->Get<cudaStream_t>();
 
+    if (gridDim.x == 0 && gridDim.y == 0 && gridDim.z == 0 &&
+        blockDim.x == 0 && blockDim.y == 0 && blockDim.z == 0 &&
+        sharedMem == 0 && stream == nullptr) {
+        CudaRtHandler::CallConfiguration cfg;
+        if (pThis->PopSavedCallConfiguration(cfg)) {
+            gridDim = cfg.gridDim;
+            blockDim = cfg.blockDim;
+            sharedMem = cfg.sharedMem;
+            stream = cfg.stream;
+        }
+    }
+
     std::string deviceFunc = pThis->getDeviceFunc(func);
     NvInfoFunction infoFunction = pThis->getInfoFunc(deviceFunc);
 
@@ -127,6 +139,18 @@ CUDA_ROUTINE_HANDLER(LaunchCooperativeKernel) {
     size_t sharedMem = input_buffer->Get<size_t>();
     cudaStream_t stream = input_buffer->Get<cudaStream_t>();
 
+    if (gridDim.x == 0 && gridDim.y == 0 && gridDim.z == 0 &&
+        blockDim.x == 0 && blockDim.y == 0 && blockDim.z == 0 &&
+        sharedMem == 0 && stream == nullptr) {
+        CudaRtHandler::CallConfiguration cfg;
+        if (pThis->PopSavedCallConfiguration(cfg)) {
+            gridDim = cfg.gridDim;
+            blockDim = cfg.blockDim;
+            sharedMem = cfg.sharedMem;
+            stream = cfg.stream;
+        }
+    }
+
     std::string deviceFunc = pThis->getDeviceFunc(func);
     NvInfoFunction infoFunction = pThis->getInfoFunc(deviceFunc);
 
@@ -161,6 +185,17 @@ CUDA_ROUTINE_HANDLER(Launch) {
     dim3 blockDim = input_buffer->Get<dim3>();
     size_t sharedMem = input_buffer->Get<size_t>();
     cudaStream_t stream = input_buffer->Get<cudaStream_t>();
+
+    // if (gridDim.x == 0 && gridDim.y == 0 && gridDim.z == 0 &&
+    //     blockDim.x == 0 && blockDim.y == 0 && blockDim.z == 0 &&
+    //     sharedMem == 0 && stream == nullptr) {
+    CudaRtHandler::CallConfiguration cfg;
+    if (pThis->PopSavedCallConfiguration(cfg)) {
+        gridDim = cfg.gridDim;
+        blockDim = cfg.blockDim;
+        sharedMem = cfg.sharedMem;
+        stream = cfg.stream;
+    }
 
     cudaError_t exit_code = cudaConfigureCall(gridDim, blockDim, sharedMem, stream);
 
