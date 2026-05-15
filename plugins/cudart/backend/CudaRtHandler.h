@@ -44,6 +44,7 @@
 #include <unistd.h>
 
 #include <cstdio>
+#include <deque>
 #include <iostream>
 #include <map>
 #include <string>
@@ -120,6 +121,24 @@ class CudaRtHandler : public gvirtus::backend::Handler {
         return mapHost2DeviceFunc->find(hostFunc)->second;
     };
 
+    struct CallConfiguration {
+        dim3 gridDim;
+        dim3 blockDim;
+        size_t sharedMem;
+        cudaStream_t stream;
+    };
+
+    inline void PushSavedCallConfiguration(const CallConfiguration &cfg) {
+        mpCallConfigurationStack->push_back(cfg);
+    }
+
+    inline bool PopSavedCallConfiguration(CallConfiguration &cfg) {
+        if (mpCallConfigurationStack->empty()) return false;
+        cfg = mpCallConfigurationStack->back();
+        mpCallConfigurationStack->pop_back();
+        return true;
+    }
+
     static void hexdump(void *ptr, int buflen) {
         unsigned char *buf = (unsigned char *)ptr;
         int i, j;
@@ -149,6 +168,7 @@ class CudaRtHandler : public gvirtus::backend::Handler {
     std::map<std::string, cudaSurfaceObject_t *> *mpSurface;
     map<std::string, NvInfoFunction> *mapDeviceFunc2InfoFunc;
     map<const void *, std::string> *mapHost2DeviceFunc;
+    std::deque<CallConfiguration> *mpCallConfigurationStack;
     void *mpShm;
     int mShmFd;
 };

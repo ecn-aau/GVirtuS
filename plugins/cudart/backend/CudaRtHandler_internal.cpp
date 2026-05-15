@@ -396,6 +396,10 @@ CUDA_ROUTINE_HANDLER(PopCallConfiguration) {
         cudaStream_t stream;
         cudaError_t exit_code = static_cast<cudaError_t>(
             __cudaPopCallConfiguration(&gridDim, &blockDim, &sharedMem, &stream));
+
+        CudaRtHandler::CallConfiguration cfg{gridDim, blockDim, sharedMem, stream};
+        pThis->PushSavedCallConfiguration(cfg);
+
         std::shared_ptr<Buffer> out = std::make_shared<Buffer>();
 
         out->Add(gridDim);

@@ -63,6 +63,7 @@ run-openpose-test:
 		-v ./src:/opt/GVirtuS/src \
 		-v ./examples/openpose/media:/opt/openpose/examples/media \
 		-v ./examples/openpose:/opt/openpose/examples/gvirtus \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
 		-v ./examples/openpose/properties.json:/opt/GVirtuS/etc/properties.json \
 		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
 		-v ./examples/openpose/entrypoint.sh:/entrypoint.sh \

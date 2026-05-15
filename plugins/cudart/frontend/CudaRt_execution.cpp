@@ -207,8 +207,12 @@ extern "C" __host__ cudaError_t cudaLaunchKernel(const void *func, dim3 gridDim,
     // cout << "BlockDim: " << blockDim.x << "," << blockDim.y << "," << blockDim.z << endl;
     // cout << "SharedMem: " << sharedMem << endl;
     // cout << "Stream: " << stream << endl;
-
-    CudaRtFrontend::Execute("cudaLaunchKernel");
+    if (CudaRtFrontend::findStream(stream)) {
+        CudaRtFrontend::Execute_Async("cudaLaunchKernel", nullptr, stream);
+        return cudaSuccess;
+    } else {
+        CudaRtFrontend::Execute("cudaLaunchKernel");
+    }
     free(pArgsPayload);
     return CudaRtFrontend::GetExitCode();
 }
