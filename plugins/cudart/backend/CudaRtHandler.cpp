@@ -45,10 +45,20 @@ CudaRtHandler::CudaRtHandler() {
 
     mapHost2DeviceFunc = new map<const void *, std::string>();
     mapDeviceFunc2InfoFunc = new map<std::string, NvInfoFunction>();
+    mpCallConfigurationStack = new std::deque<CallConfiguration>();
     Initialize();
 }
 
-CudaRtHandler::~CudaRtHandler() {}
+CudaRtHandler::~CudaRtHandler() {
+    delete mpFatBinary;
+    delete mpDeviceFunction;
+    delete mpVar;
+    delete mpTexture;
+    delete mpSurface;
+    delete mapHost2DeviceFunc;
+    delete mapDeviceFunc2InfoFunc;
+    delete mpCallConfigurationStack;
+}
 
 bool CudaRtHandler::CanExecute(std::string routine) {
     map<string, CudaRtHandler::CudaRoutineHandler>::iterator it;

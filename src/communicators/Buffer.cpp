@@ -94,6 +94,24 @@ void Buffer::Reset() {
     mBackOffset = 0;
 }
 
+void Buffer::CopyFrom(const Buffer &src) {
+    if (&src == this) return;
+    mBlockSize = src.mBlockSize;
+    mLength = src.mLength;
+    mOffset = src.mOffset;
+    mBackOffset = src.mBackOffset;
+    mSize = src.mLength;
+    if (mOwnBuffer) {
+        if ((mpBuffer = (char *)realloc(mpBuffer, mSize)) == NULL)
+            throw runtime_error("Can't reallocate memory.");
+    } else {
+        if ((mpBuffer = (char *)malloc(mSize)) == NULL)
+            throw runtime_error("Can't allocate memory.");
+    }
+    mOwnBuffer = true;
+    memmove(mpBuffer, src.mpBuffer, mLength);
+}
+
 void Buffer::Reset(Communicator *c) {
     c->Read((char *)&mLength, sizeof(size_t));
 #ifdef DEBUG
@@ -108,6 +126,38 @@ void Buffer::Reset(Communicator *c) {
     }
 
     c->Read(mpBuffer, mLength);
+}
+
+void Buffer::Reset_Async(Communicator *c, void* stream) {
+    c->Read_Async((char *)&mLength, sizeof(size_t), stream);
+#ifdef DEBUG
+    cout << "Read " << mLength << " bytes from the buffer" << endl;
+#endif
+    mOffset = 0;
+    mBackOffset = mLength;
+    if (mLength >= mSize) {
+        mSize = (mLength / mBlockSize + 1) * mBlockSize;
+        if ((mpBuffer = (char *)realloc(mpBuffer, mSize)) == NULL)
+            throw runtime_error("Can't reallocate memory.");
+    }
+
+    c->Read_Async(mpBuffer, mLength, stream);
+}
+
+void Buffer::Reset_Async(Communicator *c, void* stream, size_t length) {
+    mLength = length;
+#ifdef DEBUG
+    cout << "Read " << mLength << " bytes from the buffer" << endl;
+#endif
+    mOffset = 0;
+    mBackOffset = mLength;
+    if (mLength >= mSize) {
+        mSize = (mLength / mBlockSize + 1) * mBlockSize;
+        if ((mpBuffer = (char *)realloc(mpBuffer, mSize)) == NULL)
+            throw runtime_error("Can't reallocate memory.");
+    }
+
+    c->Read_Async(mpBuffer, mLength, stream);
 }
 
 const char *const Buffer::GetBuffer() const { return mpBuffer; }
@@ -130,4 +180,11 @@ void Buffer::Dump(Communicator *c) const {
      * notifica
      *
      */
+}
+
+void Buffer::Dump_Async(Communicator *c, void* stream) const {
+
+    c->Write_Async((char *)&mLength, sizeof(size_t), stream);
+    c->Write_Async(mpBuffer, mLength, stream);
+
 }

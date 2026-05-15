@@ -293,9 +293,13 @@ class Buffer {
 
     void Reset();
     void Reset(Communicator *c);
+    void Reset_Async(Communicator *c, void* stream);
+    void Reset_Async(Communicator *c, void* stream, size_t length);
+    void CopyFrom(const Buffer &src);
     const char *const GetBuffer() const;
     size_t GetBufferSize() const;
     void Dump(Communicator *c) const;
+    void Dump_Async(Communicator *c, void* stream) const;
 
    private:
     size_t mBlockSize;

@@ -22,7 +22,7 @@ int main() {
     cudaMemcpy(d_A, A, 6 * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(d_B, B, 6 * sizeof(float), cudaMemcpyHostToDevice);
 
-    // Create cuBLAS handle
+    // // Create cuBLAS handle
     cublasHandle_t handle;
     cublasCreate(&handle);
 
@@ -40,7 +40,7 @@ int main() {
     }
     std::cout << std::endl;
 
-    // Free resources
+    // // Free resources
     cublasDestroy(handle);
     cudaFree(d_A);
     cudaFree(d_B);

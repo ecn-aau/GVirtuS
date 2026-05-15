@@ -33,8 +33,10 @@ using namespace std;
 extern "C" __host__ cudaError_t CUDARTAPI cudaStreamCreate(cudaStream_t* pStream) {
     CudaRtFrontend::Prepare();
     CudaRtFrontend::Execute("cudaStreamCreate");
-    if (CudaRtFrontend::Success())
+    if (CudaRtFrontend::Success()) {
         *pStream = (cudaStream_t)CudaRtFrontend::GetOutputDevicePointer();
+        CudaRtFrontend::Start_Stream(*pStream);
+    }
     return CudaRtFrontend::GetExitCode();
 }
 
@@ -43,8 +45,10 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaStreamCreateWithFlags(cudaStream_t
     CudaRtFrontend::Prepare();
     CudaRtFrontend::AddVariableForArguments(flags);
     CudaRtFrontend::Execute("cudaStreamCreateWithFlags");
-    if (CudaRtFrontend::Success())
+    if (CudaRtFrontend::Success()) {
         *pStream = (cudaStream_t)CudaRtFrontend::GetOutputDevicePointer();
+        CudaRtFrontend::Start_Stream(*pStream);
+    }
     return CudaRtFrontend::GetExitCode();
 }
 
@@ -52,6 +56,8 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaStreamDestroy(cudaStream_t stream)
     CudaRtFrontend::Prepare();
     CudaRtFrontend::AddDevicePointerForArguments(stream);
     CudaRtFrontend::Execute("cudaStreamDestroy");
+    // Shut down the QUIC channel and signal the frontend worker thread.
+    CudaRtFrontend::Stop_Stream(stream);
     return CudaRtFrontend::GetExitCode();
 }
 
@@ -84,8 +90,10 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaStreamCreateWithPriority(cudaStrea
     CudaRtFrontend::AddVariableForArguments(flags);
     CudaRtFrontend::AddVariableForArguments(priority);
     CudaRtFrontend::Execute("cudaStreamCreateWithPriority");
-    if (CudaRtFrontend::Success())
+    if (CudaRtFrontend::Success()) {
         *pStream = (cudaStream_t)CudaRtFrontend::GetOutputDevicePointer();
+        CudaRtFrontend::Start_Stream(*pStream);
+    }
     return CudaRtFrontend::GetExitCode();
 }
 
@@ -93,6 +101,7 @@ extern "C" __host__ cudaError_t CUDARTAPI cudaStreamSynchronize(cudaStream_t str
     CudaRtFrontend::Prepare();
     CudaRtFrontend::AddDevicePointerForArguments(stream);
     CudaRtFrontend::Execute("cudaStreamSynchronize");
+    CudaRtFrontend::Wait_Stream(stream);
     return CudaRtFrontend::GetExitCode();
 }
 

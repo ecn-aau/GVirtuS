@@ -16,7 +16,16 @@ if [ $? -ne 0 ]; then
 fi
 
 # --- Navigate to the examples folder ---
-cd "${GVIRTUS_HOME}/examples/simple_matrix" || { echo "Failed to enter ${GVIRTUS_HOME}/examples"; exit 1; }
+cd "${GVIRTUS_HOME}/examples/simple_matrix_paper" || { echo "Failed to enter ${GVIRTUS_HOME}/examples"; exit 1; }
+
+# --- Compile the async CUDA program ---
+nvcc simple_matrix_async.cu -o simple_matrix_app_async \
+    -L${GVIRTUS_HOME}/lib/frontend \
+    -L${GVIRTUS_HOME}/lib/ \
+    -lcuda -lcudart -lcublas 
+
+# --- Run the compiled program ---
+./simple_matrix_app_async
 
 # --- Compile the CUDA program ---
 nvcc simple_matrix.cu -o simple_matrix_app \

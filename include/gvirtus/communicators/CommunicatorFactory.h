@@ -12,6 +12,7 @@
 #include "Endpoint.h"
 #include "Endpoint_Rdma.h"
 #include "Endpoint_Tcp.h"
+#include "Endpoint_Quic.h"
 
 // #define DEBUG
 
@@ -36,12 +37,12 @@ class CommunicatorFactory {
         std::cout << "DEBUG: protocol string is [" << end->protocol() << "]" << std::endl;
         // Supported unsecure communicators
         std::vector<std::string> unsecureMatches = {
-            "tcp", "http", "oldtcp", "ws", "ib", "hybrid",
+            "tcp", "http", "oldtcp", "ws", "ib", "hybrid"
 
         };
 
         // Supported secure communicators
-        std::vector<std::string> secureMatches = {"https", "wss"};
+        std::vector<std::string> secureMatches = {"https", "wss", "quic"};
 
         // Is the desired communicator a secure communicator?
         if (not secure) {

@@ -25,6 +25,7 @@ class Process : public common::Observable {
             std::vector<std::string> &plugins);
     ~Process() override;
     void Start();
+    void StartStreamProcess(communicators::Communicator* client, void* stream);
 
    private:
     std::shared_ptr<

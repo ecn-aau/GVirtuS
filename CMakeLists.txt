@@ -56,6 +56,7 @@ add_library(gvirtus-common SHARED
     src/common/SignalException.cpp
     src/common/SignalState.cpp
     src/common/Util.cpp
+    src/common/Property.cpp
 )
 target_link_libraries(gvirtus-common stdc++fs ${CMAKE_DL_LIBS} ${LIBLOG4CPLUS} rdmacm ibverbs)
 
@@ -73,6 +74,7 @@ add_library(gvirtus-communicators SHARED
     src/communicators/Buffer.cpp
     src/communicators/CommunicatorFactory.cpp
     src/communicators/Endpoint_Tcp.cpp
+    src/communicators/Endpoint_Quic.cpp
     src/communicators/Endpoint_Rdma.cpp
     src/communicators/Endpoint_Hybrid.cpp
     src/communicators/EndpointFactory.cpp
@@ -87,6 +89,12 @@ add_library(gvirtus-communicators-tcp SHARED
     src/communicators/tcp/TcpCommunicator.cpp)
 target_link_libraries(gvirtus-communicators-tcp gvirtus-communicators)
 gvirtus_install_target(gvirtus-communicators-tcp)
+
+## Quic COMMUNICATOR
+add_library(gvirtus-communicators-quic SHARED
+    src/communicators/quic/QuicCommunicator_new.cpp)
+target_link_libraries(gvirtus-communicators-quic gvirtus-communicators ${LIBMSQUIC})
+gvirtus_install_target(gvirtus-communicators-quic)
 
 ## IB COMMUNICATOR
 add_library(gvirtus-communicators-ib SHARED
@@ -107,6 +115,7 @@ target_include_directories(gvirtus-communicators-hybrid
 target_link_libraries(gvirtus-communicators-hybrid
     gvirtus-communicators
     gvirtus-communicators-tcp
+    gvirtus-communicators-quic
     gvirtus-communicators-ib
 )
 gvirtus_install_target(gvirtus-communicators-hybrid)
@@ -133,7 +142,6 @@ add_executable(gvirtus-backend
     src/backend/Backend.cpp
     src/backend/main.cpp
     src/backend/Process.cpp
-    src/backend/Property.cpp
 )
 target_include_directories(gvirtus-backend
     PRIVATE

@@ -84,7 +84,7 @@ bool getstring(Communicator *c, string &s) {
 #endif
 
     // TODO: FIX LISKOV SUBSTITUTION AND DIPENDENCE INVERSION!!!!!
-    if (c->to_string() == "tcpcommunicator") {
+    if (c->to_string() == "tcpcommunicator" || c->to_string() == "quiccommunicator") {
         s = "";
         char ch = 0;
         while (c->Read(&ch, 1) == 1) {
@@ -125,6 +125,19 @@ bool getstring(Communicator *c, string &s) {
     }
 
     throw runtime_error("Communicator getstring read error... Unknown communicator type...");
+}
+
+bool getstringasync(Communicator *c, string &s, void* stream) {
+    s = "";
+    char ch = 0;
+    while (c->Read_Async(&ch, 1, stream) == 1) {
+        // If reading is ended, return true
+        if (ch == 0) {
+            return true;
+        }
+        s += ch;
+    }
+    return false;
 }
 
 extern std::string getEnvVar(std::string const &key);
@@ -221,10 +234,20 @@ void Process::Start() {
                 hybrid->end_call();
             }
 
+            if (client_comm->to_string() == "quiccommunicator") {
+
+                if (routine.rfind("cudaStreamCreate", 0) == 0) {
+                    void * stream_ptr = result->GetOutputBuffer()->Get<void *>();
+                    client_comm->Server_Start_Stream(stream_ptr);
+                    this->StartStreamProcess(client_comm, stream_ptr);
+                }
+
+            }
+
             LOG4CPLUS_DEBUG(logger, "[Process " << getpid() << "]: Routine '" << routine
                                                 << "' returned " << result->GetExitCode() << ".");
         }
-
+        
         Notify("process-ended");
     };
 
@@ -265,6 +288,62 @@ void Process::Start() {
 
     LOG4CPLUS_DEBUG(logger, "Process::Start() returned [Process " << getpid() << "].");
     // exit(EXIT_SUCCESS);
+}
+
+
+void Process::StartStreamProcess(Communicator* client, void* stream) {
+    std::function<void(Communicator *)> execute_async = [this, stream](Communicator *client_comm) {
+            LOG4CPLUS_DEBUG(logger, "[Process " << getpid() << "]"
+                                                << "Process::Start()'s \"execute\" lambda called");
+            // carica i puntatori ai simboli dei moduli in mHandlers
+
+            string routine;
+            std::shared_ptr<Buffer> input_buffer = std::make_shared<Buffer>();
+            while (getstringasync(client_comm, routine, stream)) {
+                LOG4CPLUS_DEBUG(logger, "Received routine " << routine);
+
+                // now reading buffer：8B from TCP, payload will transfer by the selected protocol
+                input_buffer->Reset_Async(client_comm, stream);
+
+                std::shared_ptr<Handler> h = nullptr;
+                for (auto &ptr_el : _handlers) {
+                    if (ptr_el->obj_ptr()->CanExecute(routine)) {
+                        h = ptr_el->obj_ptr();
+                        break;
+                    }
+                }
+
+                std::shared_ptr<communicators::Result> result;
+                if (h == nullptr) {
+                    LOG4CPLUS_ERROR(logger, "[Process " << getpid() << "]: Requested unknown routine '"
+                                                        << routine << "'.");
+                    result = std::make_shared<communicators::Result>(-1, std::make_shared<Buffer>());
+                } else {
+                    auto start = steady_clock::now();
+                    result = h->Execute(routine, input_buffer);
+                    result->TimeTaken(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                        steady_clock::now() - start)
+                                        .count() /
+                                    1000.0);
+                }
+
+
+                // return info：control the head transfer by TCP，then payload RDMA
+                result->Dump_Async(client_comm, stream);
+
+
+
+                LOG4CPLUS_DEBUG(logger, "[Process " << getpid() << "]: Routine '" << routine
+                                                    << "' returned " << result->GetExitCode() << ".");
+            }
+
+            
+            Notify("process-ended");
+
+        };
+
+        std::thread(execute_async, client).detach();
+
 }
 
 Process::~Process() {

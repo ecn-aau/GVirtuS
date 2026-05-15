@@ -1,6 +1,9 @@
 FROM nvidia/cuda:12.6.3-cudnn-devel-ubuntu22.04
 RUN apt update && apt install -y --no-install-recommends \
     build-essential \
+    git \
+    libssl-dev \
+    ca-certificates \
     libxmu-dev \
     libxi-dev \
     libgl-dev \
@@ -14,15 +17,15 @@ RUN apt update && apt install -y --no-install-recommends \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-ARG MSQUIC_VERSION=2.5.6
-RUN wget -q https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb \
-    && dpkg -i packages-microsoft-prod.deb \
-    && rm packages-microsoft-prod.deb \
-    && apt update \
-    && apt install -y --no-install-recommends libmsquic=${MSQUIC_VERSION} \
-    && rm -rf /var/lib/apt/lists/*
 
 ENV GVIRTUS_HOME=/opt/GVirtuS
+    
+COPY ./msquic ${GVIRTUS_HOME}/msquic
+RUN cd ${GVIRTUS_HOME}/msquic &&  \
+    cmake -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build && \
+    cmake --install build
+
 ENV DEBIAN_FRONTEND=noninteractive
 
 COPY ./src/ ${GVIRTUS_HOME}/src/
@@ -40,5 +43,5 @@ RUN cmake -B build -DCMAKE_INSTALL_PREFIX=${GVIRTUS_HOME} \
     cd build && \
     make -j$(nproc) && make install
 
-ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:${LD_LIBRARY_PATH}
+ENV LD_LIBRARY_PATH=${GVIRTUS_HOME}/lib:/usr/local/lib:${LD_LIBRARY_PATH}
 WORKDIR ${GVIRTUS_HOME}

@@ -124,3 +124,5 @@ gtest
 gvirtus/backend/gvirtus-backend
 
 gvirtus/uWebSockets-prefix/
+
+examples/openpose/models

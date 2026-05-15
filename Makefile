@@ -63,6 +63,7 @@ run-openpose-test:
 		-v ./src:/opt/GVirtuS/src \
 		-v ./examples/openpose/media:/opt/openpose/examples/media \
 		-v ./examples/openpose:/opt/openpose/examples/gvirtus \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
 		-v ./examples/openpose/properties.json:/opt/GVirtuS/etc/properties.json \
 		-v ./examples/openpose/entrypoint.sh:/entrypoint.sh \
 		openpose_gvirtus:cuda12.6 \
@@ -89,6 +90,7 @@ run-2d-human-parsing-test:
 		-v ./examples/2d-human-parsing/inference_acc_00.py:/opt/2D-Human-Parsing/inference/inference_acc_00.py \
 		-v ./examples/2d-human-parsing/demo_imgs:/opt/2D-Human-Parsing/demo_imgs \
 		-v ./examples/2d-human-parsing/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
 		-v ./examples/2d-human-parsing/entrypoint.sh:/entrypoint.sh \
 		human-parsing_gvirtus:cuda12.6 \
 		bash /entrypoint.sh
@@ -104,7 +106,25 @@ run-simple-matrix-test:
 		-v ./plugins:/opt/GVirtuS/plugins \
 		-v ./src:/opt/GVirtuS/src \
 		-v ./examples/simple_matrix/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
 		-v ./examples/simple_matrix:/opt/GVirtuS/examples/simple_matrix \
 		-v ./examples/simple_matrix/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
+		gvirtus:cuda12.6 \
+		bash /opt/GVirtuS/entrypoint.sh
+
+# Simple Matrix example.
+run-simple-matrix-paper-test:
+	docker run \
+		--rm \
+		-it \
+		--name simple_matrix_test_paper_container \
+		--network host \
+		-v ./include:/opt/GVirtuS/include \
+		-v ./plugins:/opt/GVirtuS/plugins \
+		-v ./src:/opt/GVirtuS/src \
+		-v ./examples/simple_matrix_paper/properties.json:/opt/GVirtuS/etc/properties.json \
+		-v ./etc/quic_settings.json:/opt/GVirtuS/etc/quic_settings.json \
+		-v ./examples/simple_matrix_paper:/opt/GVirtuS/examples/simple_matrix_paper \
+		-v ./examples/simple_matrix_paper/entrypoint.sh:/opt/GVirtuS/entrypoint.sh \
 		gvirtus:cuda12.6 \
 		bash /opt/GVirtuS/entrypoint.sh
